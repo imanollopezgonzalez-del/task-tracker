@@ -88,21 +88,32 @@ export const completeAndRecur = async (task, userId) => {
     updatedAt: serverTimestamp(),
   })
   if (task.type === 'recurring' && task.recurrence) {
-    const base = task.dueDate?.toDate ? task.dueDate.toDate() : new Date(task.dueDate)
+    // Calcular fecha base: si no tiene fecha límite, usar hoy
+    const base = task.dueDate?.toDate
+      ? task.dueDate.toDate()
+      : task.dueDate
+        ? new Date(task.dueDate)
+        : new Date()
+
     let nextDate
     switch (task.recurrence) {
       case 'daily': nextDate = addDays(base, 1); break
       case 'weekly': nextDate = addWeeks(base, 1); break
       case 'monthly': nextDate = addMonths(base, 1); break
       case 'annual': nextDate = addYears(base, 1); break
+      default: nextDate = addDays(base, 1)
     }
+
+    // Extraer solo los campos seguros (sin id ni timestamps originales)
+    const { id, createdAt, updatedAt, completedAt, dueDate, startDate, ...taskBase } = task
+
     const newRef = doc(collection(db, TASKS_COL))
     batch.set(newRef, {
-      ...task,
-      id: undefined,
+      ...taskBase,
       status: 'not_started',
       completedAt: null,
       dueDate: Timestamp.fromDate(nextDate),
+      startDate: Timestamp.fromDate(nextDate),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       createdBy: userId,
