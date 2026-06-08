@@ -1,10 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
-import { auth } from '../firebase'
+import { auth, db } from '../firebase'
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile,
 } from 'firebase/auth'
-import { createUserProfile, getUserProfile, createCompany, joinCompany } from '../services/users'
+import {
+  doc, setDoc, getDoc, collection, serverTimestamp,
+} from 'firebase/firestore'
+import { getUserProfile } from '../services/users'
 
 const AuthContext = createContext(null)
 export const useAuth = () => useContext(AuthContext)
@@ -13,7 +16,6 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  // Flag para evitar que onAuthStateChanged sobreescriba el perfil durante registro
   const registeringRef = useRef(false)
 
   useEffect(() => {
@@ -30,10 +32,10 @@ export function AuthProvider({ children }) {
     return unsub
   }, [])
 
-  // register maneja todo en secuencia: crear usuario → empresa → perfil con rol correcto
   const register = async (email, password, displayName, companyCode) => {
     registeringRef.current = true
     try {
+      // 1. Crear usuario en Firebase Auth
       const cred = await createUserWithEmailAndPassword(auth, email, password)
       await updateProfile(cred.user, { displayName })
 
@@ -41,14 +43,35 @@ export function AuthProvider({ children }) {
       let companyId = null
 
       if (companyCode?.trim()) {
-        await joinCompany(cred.user.uid, companyCode.trim())
+        // Unirse a empresa existente
+        const companySnap = await getDoc(doc(db, 'companies', companyCode.trim()))
+        if (!companySnap.exists()) throw new Error('Código de empresa incorrecto')
         companyId = companyCode.trim()
+        role = 'member'
       } else {
-        companyId = await createCompany('Mi Empresa', cred.user.uid)
+        // Crear empresa nueva — este usuario es el admin
+        const companyRef = doc(collection(db, 'companies'))
+        await setDoc(companyRef, {
+          name: 'Mi Empresa',
+          ownerUid: cred.user.uid,
+          createdAt: serverTimestamp(),
+        })
+        companyId = companyRef.id
         role = 'admin'
       }
 
-      await createUserProfile(cred.user, { displayName, role, companyId })
+      // 2. Crear perfil de usuario con rol correcto (todo en una escritura)
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        uid: cred.user.uid,
+        displayName,
+        role,
+        companyId,
+        fcmToken: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })
+
+      // 3. Cargar perfil en contexto
       const profile = await getUserProfile(cred.user.uid)
       setUserProfile(profile)
       return cred.user
@@ -70,6 +93,7 @@ export function AuthProvider({ children }) {
     if (!currentUser) return
     const profile = await getUserProfile(currentUser.uid)
     setUserProfile(profile)
+    return profile
   }
 
   const value = { currentUser, userProfile, loading, register, login, logout, refreshProfile }
