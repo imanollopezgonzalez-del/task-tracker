@@ -3,14 +3,14 @@ import {
   doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp,
 } from 'firebase/firestore'
 
-// Genera email interno desde nombre de usuario + código de empresa
-export const buildUserEmail = (username, companyCode) => {
+// Email interno: solo desde el nombre de usuario (sin código empresa)
+export const buildUserEmail = (username) => {
   const normalized = username
     .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar tildes
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .trim().replace(/\s+/g, '_')
     .replace(/[^a-z0-9_]/g, '')
-  return `${normalized}@${companyCode.slice(0, 20)}.tasks`
+  return `${normalized}@tasks.internal`
 }
 
 export const createUserProfile = async (user, extra = {}) => {

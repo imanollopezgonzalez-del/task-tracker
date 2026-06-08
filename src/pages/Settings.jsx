@@ -48,14 +48,14 @@ export default function Settings() {
       const credential = EmailAuthProvider.credential(currentUser.email, currentPwd)
       await reauthenticateWithCredential(currentUser, credential)
       // Cambiar email y contraseña al nuevo formato PIN
-      const newEmail = buildUserEmail(pinUsername, userProfile.companyId)
+      const newEmail = buildUserEmail(pinUsername)
       await updateEmail(currentUser, newEmail)
-      await updatePassword(currentUser, 'TK' + newPin)
+      await updatePassword(currentUser, newPin)
       await updateProfile(currentUser, { displayName: pinUsername })
       await updateUserProfile(currentUser.uid, { displayName: pinUsername })
       await refreshProfile()
       localStorage.setItem('companyCode', userProfile.companyId)
-      toast.success(`¡Listo! Ahora puedes entrar con: "${pinUsername}" + PIN ${newPin}`)
+      toast.success(`¡Listo! Entra con usuario "${pinUsername}" y tu PIN`)
       setCurrentPwd('')
       setNewPin('')
     } catch (err) {
@@ -133,10 +133,10 @@ export default function Settings() {
                   value={pinUsername} onChange={(e) => setPinUsername(e.target.value)} />
               </div>
               <div>
-                <label className="label">Nuevo PIN <span className="normal-case font-normal text-brand-text-light">(4 dígitos)</span></label>
-                <input type="password" inputMode="numeric" maxLength={4} className="input-field tracking-widest text-lg"
-                  placeholder="••••" value={newPin}
-                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                <label className="label">Nuevo PIN <span className="normal-case font-normal text-brand-text-light">(6 dígitos)</span></label>
+                <input type="password" inputMode="numeric" maxLength={6} className="input-field tracking-widest text-lg text-center"
+                  placeholder="······" value={newPin}
+                  onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 6))} />
               </div>
               <div>
                 <label className="label">Contraseña actual <span className="normal-case font-normal text-brand-text-light">(para confirmar)</span></label>
