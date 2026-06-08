@@ -1,6 +1,6 @@
 import { db } from '../firebase'
 import {
-  collection, addDoc, updateDoc, query, where, orderBy,
+  collection, addDoc, updateDoc, query, where,
   onSnapshot, serverTimestamp, writeBatch, getDocs, doc,
 } from 'firebase/firestore'
 import { NOTIFICATION_TYPES } from '../utils/constants'
@@ -20,15 +20,15 @@ export const createNotification = async ({ recipientId, taskId, taskTitle, type,
   })
 }
 
+// Sin orderBy → evita índice compuesto, ordenamos client-side
 export const subscribeNotifications = (userId, callback) => {
-  const q = query(
-    collection(db, COL),
-    where('recipientId', '==', userId),
-    orderBy('createdAt', 'desc')
-  )
+  const q = query(collection(db, COL), where('recipientId', '==', userId))
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-  })
+    const notifs = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    callback(notifs)
+  }, (err) => console.error('subscribeNotifications error:', err))
 }
 
 export const markAsRead = async (notificationId) => {
@@ -38,6 +38,7 @@ export const markAsRead = async (notificationId) => {
 export const markAllAsRead = async (userId) => {
   const q = query(collection(db, COL), where('recipientId', '==', userId), where('read', '==', false))
   const snap = await getDocs(q)
+  if (snap.empty) return
   const batch = writeBatch(db)
   snap.docs.forEach((d) => batch.update(d.ref, { read: true }))
   await batch.commit()

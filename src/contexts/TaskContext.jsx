@@ -11,15 +11,23 @@ export function TaskProvider({ children }) {
   const [myTasks, setMyTasks] = useState([])
   const [loading, setLoading] = useState(true)
 
-  const companyId = userProfile?.companyId
+  const companyId = userProfile?.companyId || null
 
   useEffect(() => {
-    if (!currentUser || !companyId) { setAllTasks([]); setMyTasks([]); setLoading(false); return }
+    if (!currentUser || !companyId) {
+      setAllTasks([])
+      setMyTasks([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    const unsub1 = subscribeTasks(companyId, (tasks) => { setAllTasks(tasks); setLoading(false) })
+    const unsub1 = subscribeTasks(companyId, (tasks) => {
+      setAllTasks(tasks)
+      setLoading(false)
+    })
     const unsub2 = subscribeMyTasks(currentUser.uid, companyId, setMyTasks)
     return () => { unsub1(); unsub2() }
-  }, [currentUser, companyId])
+  }, [currentUser?.uid, companyId])
 
   return (
     <TaskContext.Provider value={{ allTasks, myTasks, loading, companyId }}>

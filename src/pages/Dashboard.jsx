@@ -60,7 +60,7 @@ export default function Dashboard() {
   const weekTasks = useMemo(() => myTasks.filter((t) => {
     if (t.status === 'done') return false
     if (!t.dueDate) return t.recurrence === 'weekly'
-    const d = t.dueDate?.toDate ? t.toDate() : new Date(t.dueDate)
+    const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
     return isThisWeek(d, { weekStartsOn: 1 })
   }), [myTasks])
 

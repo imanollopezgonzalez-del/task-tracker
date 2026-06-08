@@ -13,7 +13,7 @@ export default function Login() {
   const [error, setError] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [form, setForm] = useState({ email: '', password: '', displayName: '' })
-  const { login, register } = useAuth()
+  const { login, register, refreshProfile } = useAuth()
   const navigate = useNavigate()
 
   const set = (k, v) => { setError(''); setForm((f) => ({ ...f, [k]: v })) }
@@ -60,6 +60,8 @@ export default function Login() {
       } else {
         await createCompany('Mi Empresa', user.uid)
       }
+      // Recargar perfil para que companyId esté actualizado antes de entrar al dashboard
+      await refreshProfile()
       navigate('/')
       toast.success(`¡Bienvenido, ${form.displayName}!`)
     } catch (err) {

@@ -1,12 +1,15 @@
 import { db } from '../firebase'
 import {
-  collection, doc, addDoc, updateDoc, deleteDoc, getDoc, getDocs,
+  collection, doc, addDoc, updateDoc, deleteDoc, getDoc,
   query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
 import { addDays, addWeeks, addMonths, addYears } from 'date-fns'
 
 const TASKS_COL = 'tasks'
 const COMMENTS_SUB = 'comments'
+
+const sortByCreated = (tasks) =>
+  [...tasks].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
 
 export const createTask = async (data, userId) => {
   const taskData = {
@@ -41,29 +44,23 @@ export const getTask = async (taskId) => {
   return snap.exists() ? { id: snap.id, ...snap.data() } : null
 }
 
+// Sin orderBy en queries compuestas → evita necesidad de índices compuestos en Firestore
 export const subscribeTasks = (companyId, callback) => {
-  const q = query(
-    collection(db, TASKS_COL),
-    where('companyId', '==', companyId),
-    orderBy('createdAt', 'desc')
-  )
+  const q = query(collection(db, TASKS_COL), where('companyId', '==', companyId))
   return onSnapshot(q, (snap) => {
-    const tasks = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-    callback(tasks)
-  })
+    callback(sortByCreated(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
+  }, (err) => console.error('subscribeTasks error:', err))
 }
 
 export const subscribeMyTasks = (userId, companyId, callback) => {
   const q = query(
     collection(db, TASKS_COL),
     where('companyId', '==', companyId),
-    where('assignedTo', '==', userId),
-    orderBy('createdAt', 'desc')
+    where('assignedTo', '==', userId)
   )
   return onSnapshot(q, (snap) => {
-    const tasks = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
-    callback(tasks)
-  })
+    callback(sortByCreated(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
+  }, (err) => console.error('subscribeMyTasks error:', err))
 }
 
 export const addComment = async (taskId, text, user) => {
@@ -80,7 +77,7 @@ export const subscribeComments = (taskId, callback) => {
   const q = query(collection(db, TASKS_COL, taskId, COMMENTS_SUB), orderBy('createdAt', 'asc'))
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-  })
+  }, (err) => console.error('subscribeComments error:', err))
 }
 
 export const completeAndRecur = async (task, userId) => {
