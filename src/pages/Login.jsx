@@ -51,7 +51,7 @@ export default function Login() {
         if (!companyCode.trim()) { setError('Escribe el código de empresa'); setLoading(false); return }
         if (pin.length !== 4) { setError('El PIN debe ser de 4 dígitos'); setLoading(false); return }
         const internalEmail = buildUserEmail(username, companyCode)
-        await login(internalEmail, pin)
+        await login(internalEmail, 'TK' + pin)  // TK prefix: Firebase min 6 chars
         localStorage.setItem('companyCode', companyCode)
       }
       navigate('/')
@@ -69,7 +69,7 @@ export default function Login() {
     setLoading(true)
     try {
       const internalEmail = buildUserEmail(username, companyCode)
-      const user = await register(internalEmail, pin, username)
+      const user = await register(internalEmail, 'TK' + pin, username)  // TK prefix internally
       // companyCode puede ser el ID de empresa (si lo da el admin) o 'nuevo' para crear
       try {
         await joinCompany(user.uid, companyCode)
