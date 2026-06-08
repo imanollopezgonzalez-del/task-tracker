@@ -141,14 +141,6 @@ export default function TaskDetail() {
             <p className="text-sm text-brand-text-muted leading-relaxed">{task.description}</p>
           )}
 
-          {task.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {task.tags.map((tag) => (
-                <span key={tag} className="px-2 py-0.5 bg-brand-bg-2 text-brand-text-muted text-xs rounded-lg border border-brand-border">{tag}</span>
-              ))}
-            </div>
-          )}
-
           {/* Meta info */}
           <div className="grid grid-cols-2 gap-3 pt-2 border-t border-brand-border">
             {assignee && (

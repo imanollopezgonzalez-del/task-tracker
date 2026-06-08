@@ -36,15 +36,6 @@ export default function TaskCard({ task, users = [], onEdit, compact = false }) 
           <p className="text-xs text-brand-text-muted line-clamp-2 mb-2">{task.description}</p>
         )}
 
-        {task.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
-            {task.tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="px-1.5 py-0.5 bg-brand-bg-2 text-brand-text-muted text-xs rounded-md border border-brand-border">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
 
         <div className="flex items-center justify-between gap-2 mt-2">
           <div className="flex items-center gap-2">

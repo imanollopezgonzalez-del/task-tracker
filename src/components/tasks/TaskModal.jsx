@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
 import { PRIORITIES, STATUSES, RECURRENCES } from '../../utils/constants'
-import { createTask, updateTask } from '../../services/tasks'
+import { createTask, updateTask, addComment } from '../../services/tasks'
 import { createNotification } from '../../services/notifications'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTasks } from '../../contexts/TaskContext'
@@ -13,7 +13,7 @@ import { ChevronDown } from 'lucide-react'
 const EMPTY = {
   title: '', description: '', priority: 'important', status: 'not_started',
   type: 'single', recurrence: 'weekly', assignedTo: '', verifiedBy: '',
-  dueDate: '', startDate: '', tags: '',
+  dueDate: '', startDate: '', observation: '',
 }
 
 export default function TaskModal({ isOpen, onClose, task, users = [] }) {
@@ -36,7 +36,7 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
         verifiedBy: task.verifiedBy || '',
         dueDate: toInputDate(task.dueDate),
         startDate: toInputDate(task.startDate),
-        tags: task.tags?.join(', ') || '',
+        observation: '',
       })
     } else {
       setForm({ ...EMPTY, assignedTo: currentUser?.uid || '', startDate: new Date().toISOString().split('T')[0] })
@@ -51,14 +51,18 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
     if (!form.assignedTo) return toast.error('Asigna la tarea a alguien')
     setLoading(true)
     try {
+      const { observation, ...rest } = form
       const data = {
-        ...form,
-        tags: form.tags ? form.tags.split(',').map((t) => t.trim()).filter(Boolean) : [],
+        ...rest,
         companyId,
         recurrence: form.type === 'recurring' ? form.recurrence : null,
       }
       if (!isEdit) {
         const taskId = await createTask(data, currentUser.uid)
+        // Guardar observación inicial como primer comentario
+        if (observation.trim()) {
+          await addComment(taskId, observation.trim(), currentUser)
+        }
         if (form.assignedTo && form.assignedTo !== currentUser.uid) {
           await createNotification({
             recipientId: form.assignedTo,
@@ -80,6 +84,9 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
         toast.success('Tarea creada')
       } else {
         await updateTask(task.id, data)
+        if (observation.trim()) {
+          await addComment(task.id, observation.trim(), currentUser)
+        }
         if (data.status === 'done' && task.status !== 'done' && form.verifiedBy) {
           await createNotification({
             recipientId: form.verifiedBy,
@@ -98,27 +105,22 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
     } finally { setLoading(false) }
   }
 
-  const assignedUser = users.find((u) => u.uid === form.assignedTo)
-  const verifiedUser = users.find((u) => u.uid === form.verifiedBy)
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Editar tarea' : 'Nueva tarea'} size="lg">
       <form onSubmit={handleSubmit} className="p-5 space-y-4">
-        {/* Title */}
+
         <div>
           <label className="label">Título *</label>
           <input type="text" required className="input-field" placeholder="¿Qué hay que hacer?"
             value={form.title} onChange={(e) => set('title', e.target.value)} />
         </div>
 
-        {/* Description */}
         <div>
           <label className="label">Descripción</label>
-          <textarea rows={3} className="textarea-field" placeholder="Descripción detallada de la tarea..."
+          <textarea rows={2} className="textarea-field" placeholder="Descripción detallada de la tarea..."
             value={form.description} onChange={(e) => set('description', e.target.value)} />
         </div>
 
-        {/* Priority + Status */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Urgencia</label>
@@ -140,7 +142,6 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
           </div>
         </div>
 
-        {/* Type + Recurrence */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Tipo de tarea</label>
@@ -166,7 +167,6 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
           )}
         </div>
 
-        {/* Assigned + Verified */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Asignado a *</label>
@@ -190,7 +190,6 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
           </div>
         </div>
 
-        {/* Dates */}
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label">Fecha inicio</label>
@@ -202,14 +201,16 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
           </div>
         </div>
 
-        {/* Tags */}
         <div>
-          <label className="label">Etiquetas <span className="normal-case font-normal">(separadas por coma)</span></label>
-          <input type="text" className="input-field" placeholder="cocina, turno mañana, limpieza..."
-            value={form.tags} onChange={(e) => set('tags', e.target.value)} />
+          <label className="label">
+            Observación inicial <span className="normal-case font-normal text-brand-text-light">(opcional)</span>
+          </label>
+          <textarea rows={2} className="textarea-field"
+            placeholder="Añade una nota o indicación para quien realiza la tarea..."
+            value={form.observation} onChange={(e) => set('observation', e.target.value)} />
+          <p className="text-xs text-brand-text-light mt-1">Se guardará como primer comentario en la tarea.</p>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose} className="btn-secondary flex-1 justify-center">Cancelar</button>
           <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
