@@ -9,7 +9,9 @@ import EmptyState from '../components/ui/EmptyState'
 import { useUsers } from '../hooks/useUsers'
 import { PRIORITIES } from '../utils/constants'
 import { CheckSquare, Plus, RefreshCw } from 'lucide-react'
-import { isToday, isThisWeek, isThisMonth, isThisYear } from 'date-fns'
+import { isToday, isThisWeek, isThisMonth, isThisYear, isBefore, startOfDay } from 'date-fns'
+import { updateTask, completeAndRecur } from '../services/tasks'
+import toast from 'react-hot-toast'
 
 const TABS = [
   { key: 'all', label: 'Todas' },
@@ -24,10 +26,9 @@ function filterByTab(tasks, tab) {
   switch (tab) {
     case 'today': return tasks.filter((t) => {
       if (t.status === 'done') return false
-      if (t.recurrence === 'daily') return true
-      if (!t.dueDate) return false
+      if (!t.dueDate) return t.recurrence === 'daily'
       const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
-      return isToday(d)
+      return isToday(d) || isBefore(d, startOfDay(new Date()))
     })
     case 'weekly': return tasks.filter((t) => t.recurrence === 'weekly' || (t.dueDate && isThisWeek(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate), { weekStartsOn: 1 })))
     case 'monthly': return tasks.filter((t) => t.recurrence === 'monthly' || (t.dueDate && isThisMonth(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate))))
@@ -77,6 +78,18 @@ export default function Tasks({ showAll = false }) {
   const handleEdit = (task) => { setEditTask(task); setShowModal(true) }
   const handleClose = () => { setShowModal(false); setEditTask(null) }
 
+  const handleComplete = async (task) => {
+    try {
+      if (task.type === 'recurring' && task.recurrence) {
+        await completeAndRecur(task, currentUser.uid)
+        toast.success('✓ Completada. Próxima recurrencia creada.')
+      } else {
+        await updateTask(task.id, { status: 'done' })
+        toast.success('✓ Tarea finalizada')
+      }
+    } catch { toast.error('Error al completar la tarea') }
+  }
+
   return (
     <div>
       <Header title={showAll ? 'Todas las tareas' : 'Mis tareas'} action={{ label: 'Nueva tarea', onClick: () => setShowModal(true) }} />
@@ -113,7 +126,7 @@ export default function Tasks({ showAll = false }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} users={users} onEdit={handleEdit} />
+              <TaskCard key={task.id} task={task} users={users} onEdit={handleEdit} onComplete={handleComplete} />
             ))}
           </div>
         )}

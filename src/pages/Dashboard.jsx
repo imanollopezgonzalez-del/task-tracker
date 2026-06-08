@@ -4,12 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/layout/Header'
 import TaskCard from '../components/tasks/TaskCard'
 import TaskModal from '../components/tasks/TaskModal'
-import { PRIORITIES, STATUSES } from '../utils/constants'
+import { PRIORITIES } from '../utils/constants'
 import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay } from 'date-fns'
 import { CheckSquare, Clock, AlertCircle, TrendingUp, Plus, CalendarDays } from 'lucide-react'
 import EmptyState from '../components/ui/EmptyState'
 import Avatar from '../components/ui/Avatar'
 import { useUsers } from '../hooks/useUsers'
+import { updateTask, completeAndRecur } from '../services/tasks'
+import toast from 'react-hot-toast'
 
 function StatCard({ label, value, icon: Icon, color, bg }) {
   return (
@@ -25,34 +27,39 @@ function StatCard({ label, value, icon: Icon, color, bg }) {
   )
 }
 
-function PriorityGroup({ priority, tasks, users, onEdit }) {
+function PriorityGroup({ priority, tasks, users, onEdit, onComplete }) {
   const p = PRIORITIES[priority]
   if (!tasks.length) return null
   return (
     <div>
-      <div className={`flex items-center gap-2 mb-2 px-1`}>
+      <div className="flex items-center gap-2 mb-2 px-1">
         <span className={`w-2 h-2 rounded-full ${p.dot}`} />
         <span className={`text-xs font-bold uppercase tracking-wide ${p.color}`}>{p.label}</span>
         <span className="text-xs text-brand-text-light">({tasks.length})</span>
       </div>
       <div className="space-y-2">
-        {tasks.map((t) => <TaskCard key={t.id} task={t} users={users} onEdit={onEdit} compact />)}
+        {tasks.map((t) => (
+          <TaskCard key={t.id} task={t} users={users} onEdit={onEdit} onComplete={onComplete} compact />
+        ))}
       </div>
     </div>
   )
 }
 
 export default function Dashboard() {
-  const { myTasks, allTasks } = useTasks()
+  const { myTasks } = useTasks()
   const { currentUser, userProfile } = useAuth()
   const [showModal, setShowModal] = useState(false)
   const { users } = useUsers()
   const [activeView, setActiveView] = useState('today')
   const [editTask, setEditTask] = useState(null)
 
+  // Lógica unificada para filtrar tareas de hoy:
+  // - recurrentes diarias sin fecha límite → siempre aparecen hoy
+  // - con fecha límite hoy o vencidas (no completadas)
   const todayTasks = useMemo(() => myTasks.filter((t) => {
     if (t.status === 'done') return false
-    if (!t.dueDate) return t.type === 'daily' || !t.recurrence
+    if (!t.dueDate) return t.recurrence === 'daily'
     const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
     return isToday(d) || isBefore(d, startOfDay(new Date()))
   }), [myTasks])
@@ -94,6 +101,18 @@ export default function Dashboard() {
   const handleEdit = (task) => { setEditTask(task); setShowModal(true) }
   const handleClose = () => { setShowModal(false); setEditTask(null) }
 
+  const handleComplete = async (task) => {
+    try {
+      if (task.type === 'recurring' && task.recurrence) {
+        await completeAndRecur(task, currentUser.uid)
+        toast.success('✓ Completada. Próxima recurrencia creada.')
+      } else {
+        await updateTask(task.id, { status: 'done' })
+        toast.success('✓ Tarea finalizada')
+      }
+    } catch { toast.error('Error al completar la tarea') }
+  }
+
   const VIEWS = [
     { key: 'today', label: 'Hoy', count: todayTasks.length },
     { key: 'week', label: 'Esta semana', count: weekTasks.length },
@@ -104,7 +123,6 @@ export default function Dashboard() {
     <div>
       <Header title="Mi panel" action={{ label: 'Nueva tarea', onClick: () => setShowModal(true) }} />
       <div className="px-4 lg:px-6 py-5 space-y-5 max-w-4xl">
-        {/* Welcome */}
         <div className="flex items-center gap-3">
           <Avatar name={userProfile?.displayName} size="md" />
           <div>
@@ -115,7 +133,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard label="Completadas" value={stats.done} icon={CheckSquare} color="text-green-600" bg="bg-green-50" />
           <StatCard label="En curso" value={stats.inProgress} icon={Clock} color="text-blue-600" bg="bg-blue-50" />
@@ -123,7 +140,6 @@ export default function Dashboard() {
           <StatCard label="Urgentes" value={stats.urgent} icon={TrendingUp} color="text-brand-orange" bg="bg-brand-orange-light" />
         </div>
 
-        {/* Views */}
         <div>
           <div className="flex gap-1 bg-brand-bg-2 p-1 rounded-xl mb-4 w-fit">
             {VIEWS.map(({ key, label, count }) => (
@@ -137,26 +153,20 @@ export default function Dashboard() {
           </div>
 
           {displayTasks.length === 0 ? (
-            <EmptyState
-              icon={CheckSquare}
+            <EmptyState icon={CheckSquare}
               title={`Sin tareas para ${VIEWS.find((v) => v.key === activeView)?.label.toLowerCase()}`}
               description="¡Estás al día! Crea una nueva tarea si es necesario."
-              action={
-                <button onClick={() => setShowModal(true)} className="btn-primary text-sm">
-                  <Plus size={15} /> Nueva tarea
-                </button>
-              }
+              action={<button onClick={() => setShowModal(true)} className="btn-primary text-sm"><Plus size={15} /> Nueva tarea</button>}
             />
           ) : (
             <div className="space-y-5">
               {['urgent', 'important', 'low'].map((p) => (
-                <PriorityGroup key={p} priority={p} tasks={grouped[p]} users={users} onEdit={handleEdit} />
+                <PriorityGroup key={p} priority={p} tasks={grouped[p]} users={users} onEdit={handleEdit} onComplete={handleComplete} />
               ))}
             </div>
           )}
         </div>
       </div>
-
       <TaskModal isOpen={showModal} onClose={handleClose} task={editTask} users={users} />
     </div>
   )

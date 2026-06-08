@@ -4,16 +4,17 @@ import StatusBadge from '../ui/StatusBadge'
 import Avatar from '../ui/Avatar'
 import { formatRelative, isOverdue, isDueSoon } from '../../utils/dates'
 import { RECURRENCES } from '../../utils/constants'
-import { Calendar, RefreshCw, MessageSquare, AlertCircle, Clock } from 'lucide-react'
+import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 
-export default function TaskCard({ task, users = [], onEdit, compact = false }) {
+export default function TaskCard({ task, users = [], onEdit, onComplete, compact = false }) {
   const assignee = users.find((u) => u.uid === task.assignedTo)
   const verifier = users.find((u) => u.uid === task.verifiedBy)
   const overdue = isOverdue(task.dueDate, task.status)
   const dueSoon = isDueSoon(task.dueDate, task.status)
+  const isDone = task.status === 'done'
 
   return (
-    <div className={`card hover:shadow-card-hover transition-all duration-200 cursor-pointer group ${overdue ? 'border-red-200' : ''}`}>
+    <div className={`card hover:shadow-card-hover transition-all duration-200 group ${overdue ? 'border-red-200' : ''} ${isDone ? 'opacity-70' : ''}`}>
       <Link to={`/tasks/${task.id}`} className="block p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
@@ -26,16 +27,24 @@ export default function TaskCard({ task, users = [], onEdit, compact = false }) 
               </span>
             )}
           </div>
+          {/* Botón completar */}
+          {!isDone && onComplete && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onComplete(task) }}
+              title="Marcar como finalizada"
+              className="flex-shrink-0 p-1.5 rounded-lg text-green-500 hover:bg-green-50 hover:text-green-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+              <CheckCircle2 size={20} />
+            </button>
+          )}
         </div>
 
-        <h3 className={`text-sm font-semibold text-brand-text leading-snug mb-1 ${task.status === 'done' ? 'line-through opacity-60' : ''}`}>
+        <h3 className={`text-sm font-semibold text-brand-text leading-snug mb-1 ${isDone ? 'line-through opacity-60' : ''}`}>
           {task.title}
         </h3>
 
         {!compact && task.description && (
           <p className="text-xs text-brand-text-muted line-clamp-2 mb-2">{task.description}</p>
         )}
-
 
         <div className="flex items-center justify-between gap-2 mt-2">
           <div className="flex items-center gap-2">
@@ -54,7 +63,6 @@ export default function TaskCard({ task, users = [], onEdit, compact = false }) 
               </div>
             )}
           </div>
-
           <div className="flex items-center gap-2">
             {task.dueDate && (
               <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-semibold' : dueSoon ? 'text-amber-500' : 'text-brand-text-muted'}`}>
@@ -66,7 +74,7 @@ export default function TaskCard({ task, users = [], onEdit, compact = false }) 
         </div>
       </Link>
 
-      {onEdit && (
+      {onEdit && !isDone && (
         <div className="px-4 pb-3 pt-0 flex gap-2 border-t border-brand-border mt-1">
           <button onClick={(e) => { e.preventDefault(); onEdit(task) }}
             className="text-xs text-brand-text-muted hover:text-brand-text font-medium transition-colors">

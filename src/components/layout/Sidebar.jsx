@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, LogOut, CheckSquare2, Menu, X } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, LogOut, CheckSquare2, Calendar, Menu, X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from 'react'
 import Avatar from '../ui/Avatar'
@@ -8,7 +8,8 @@ import toast from 'react-hot-toast'
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Inicio', end: true },
   { to: '/tasks', icon: CheckSquare, label: 'Mis Tareas' },
-  { to: '/all-tasks', icon: CheckSquare2, label: 'Todas las Tareas', adminOnly: false },
+  { to: '/all-tasks', icon: CheckSquare2, label: 'Todas las Tareas' },
+  { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/kpi', icon: BarChart3, label: 'KPIs & Métricas' },
   { to: '/admin', icon: Users, label: 'Equipo', adminOnly: true },
   { to: '/settings', icon: Settings, label: 'Ajustes' },
