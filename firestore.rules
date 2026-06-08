@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function uid() { return request.auth.uid; }
+    function signed() { return request.auth != null; }
+    function myData() { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function isAdmin() { return signed() && myData().role == 'admin'; }
+    function myCompany() { return myData().companyId; }
+
+    // Usuarios
+    match /users/{userId} {
+      // Cualquier usuario autenticado de la misma empresa puede leer
+      allow read: if signed() && (uid() == userId || myCompany() == resource.data.companyId);
+      // Cada usuario escribe su propio perfil
+      allow create, update: if uid() == userId;
+      // El admin puede actualizar o eliminar usuarios de su empresa (no a sí mismo)
+      allow update, delete: if isAdmin() && myCompany() == resource.data.companyId && uid() != userId;
+    }
+
+    // Empresas
+    match /companies/{companyId} {
+      allow read: if signed();
+      allow create: if signed() && request.resource.data.ownerUid == uid();
+      allow update, delete: if signed() && resource.data.ownerUid == uid();
+    }
+
+    // Tareas
+    match /tasks/{taskId} {
+      allow read: if signed() && myCompany() == resource.data.companyId;
+      allow create: if signed() && myCompany() == request.resource.data.companyId;
+      allow update, delete: if signed() && myCompany() == resource.data.companyId;
+    }
+
+    // Notificaciones
+    match /notifications/{notifId} {
+      allow read, update, delete: if signed() && uid() == resource.data.recipientId;
+      allow create: if signed();
+    }
+  }
+}

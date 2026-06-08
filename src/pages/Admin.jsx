@@ -57,8 +57,11 @@ export default function Admin() {
       await deleteDoc(doc(db, 'users', deleteTarget.uid))
       toast.success(`${deleteTarget.displayName} ha sido eliminado del equipo`)
       cancelDelete()
-    } catch {
-      toast.error('Error al eliminar el usuario')
+    } catch (err) {
+      console.error('Error eliminando usuario:', err)
+      toast.error(err?.code === 'permission-denied'
+        ? 'Sin permiso: actualiza las reglas de Firestore'
+        : `Error: ${err?.message || 'No se pudo eliminar'}`)
     } finally { setDeleting(false) }
   }
 
