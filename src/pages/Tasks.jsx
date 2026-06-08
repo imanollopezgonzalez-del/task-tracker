@@ -7,7 +7,7 @@ import TaskModal from '../components/tasks/TaskModal'
 import EmptyState from '../components/ui/EmptyState'
 import { useUsers } from '../hooks/useUsers'
 import { PRIORITIES } from '../utils/constants'
-import { CheckSquare, Plus, RefreshCw, Eye, ChevronDown, SlidersHorizontal } from 'lucide-react'
+import { CheckSquare, Plus, RefreshCw, Eye, ChevronDown, SlidersHorizontal, X } from 'lucide-react'
 import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay } from 'date-fns'
 import { updateTask, completeAndRecur } from '../services/tasks'
 import { createNotification } from '../services/notifications'
@@ -65,30 +65,29 @@ function applySort(tasks, sort, search, priority) {
 
 function ColumnHeader({ title, icon: Icon, iconColor, count, sort, setSort, search, setSearch, priority, setPriority }) {
   const [open, setOpen] = useState(false)
+  const hasFilters = search || priority
   return (
     <div className="mb-3">
       <div className="flex items-center gap-2 px-1">
         <Icon size={14} className={iconColor} />
         <span className="text-xs font-bold text-brand-text uppercase tracking-wide">{title}</span>
         {count > 0 && <span className="ml-1 text-xs bg-brand-bg-2 text-brand-text-muted px-2 py-0.5 rounded-full border border-brand-border">{count}</span>}
-        <button onClick={() => setOpen(!open)} className={`ml-auto p-1 rounded transition-colors ${open ? 'text-brand-orange' : 'text-brand-text-light hover:text-brand-text-muted'}`}>
-          <SlidersHorizontal size={13} />
+        <button onClick={() => setOpen(!open)}
+          className={`ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${open || hasFilters ? 'bg-brand-orange text-white' : 'bg-brand-bg-2 text-brand-text-muted hover:bg-brand-bg-3 hover:text-brand-text'}`}>
+          <SlidersHorizontal size={11} />
+          {hasFilters ? 'Filtrado' : 'Filtrar'}
         </button>
       </div>
       {open && (
-        <div className="mt-2 bg-brand-bg-2 rounded-lg p-2 space-y-2 border border-brand-border">
-          <input type="text" placeholder="Buscar..." className="input-field text-xs py-1.5"
-            value={search} onChange={(e) => setSearch(e.target.value)} />
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <select className="select-field text-xs py-1.5 pr-7" value={sort} onChange={(e) => setSort(e.target.value)}>
-                {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
-            </div>
-            <div className="relative flex-1">
+        <div className="mt-2 bg-brand-bg-2 rounded-lg p-3 space-y-3 border border-brand-border animate-fade-in">
+          {/* Filtrar */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Filtrar</p>
+            <input type="text" placeholder="Buscar por título..." className="input-field text-xs py-1.5"
+              value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="relative">
               <select className="select-field text-xs py-1.5 pr-7" value={priority} onChange={(e) => setPriority(e.target.value)}>
-                <option value="">Urgencia</option>
+                <option value="">Todas las urgencias</option>
                 <option value="urgent">Urgente</option>
                 <option value="important">Importante</option>
                 <option value="low">No urgente</option>
@@ -96,6 +95,23 @@ function ColumnHeader({ title, icon: Icon, iconColor, count, sort, setSort, sear
               <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
             </div>
           </div>
+          {/* Ordenar */}
+          <div className="space-y-2 pt-2 border-t border-brand-border">
+            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Ordenar</p>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <select className="select-field text-xs py-1.5 pr-7" value={sort} onChange={(e) => setSort(e.target.value)}>
+                {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
+            </div>
+          </div>
+          </div>
+          {(search || priority) && (
+            <button onClick={() => { setSearch(''); setPriority('') }} className="text-xs text-brand-text-muted hover:text-brand-text flex items-center gap-1">
+              <X size={11} /> Limpiar filtros
+            </button>
+          )}
         </div>
       )}
     </div>

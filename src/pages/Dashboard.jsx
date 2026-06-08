@@ -6,11 +6,97 @@ import TaskCard from '../components/tasks/TaskCard'
 import TaskModal from '../components/tasks/TaskModal'
 import { PRIORITIES } from '../utils/constants'
 import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay } from 'date-fns'
-import { CheckSquare, Clock, AlertCircle, TrendingUp, Plus, CalendarDays, RefreshCw, Eye } from 'lucide-react'
+import { CheckSquare, Clock, AlertCircle, TrendingUp, Plus, CalendarDays, RefreshCw, Eye, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
 import Avatar from '../components/ui/Avatar'
 import { useUsers } from '../hooks/useUsers'
 import { updateTask, completeAndRecur } from '../services/tasks'
+import { createNotification } from '../services/notifications'
 import toast from 'react-hot-toast'
+
+const SORT_OPTS = [
+  { value: 'priority', label: 'Urgencia' },
+  { value: 'dueDate', label: 'Fecha límite' },
+  { value: 'status', label: 'Estado' },
+  { value: 'title', label: 'Nombre' },
+]
+
+function applyColumnFilter(tasks, sort, search, priority) {
+  let r = [...tasks]
+  if (search) { const q = search.toLowerCase(); r = r.filter((t) => t.title.toLowerCase().includes(q)) }
+  if (priority) r = r.filter((t) => t.priority === priority)
+  r.sort((a, b) => {
+    switch (sort) {
+      case 'priority': return (PRIORITIES[a.priority]?.order || 9) - (PRIORITIES[b.priority]?.order || 9)
+      case 'dueDate': {
+        const da = a.dueDate?.toDate ? a.dueDate.toDate() : a.dueDate ? new Date(a.dueDate) : new Date('9999')
+        const db = b.dueDate?.toDate ? b.dueDate.toDate() : b.dueDate ? new Date(b.dueDate) : new Date('9999')
+        return da - db
+      }
+      case 'status': return (a.status || '').localeCompare(b.status || '')
+      case 'title': return a.title.localeCompare(b.title)
+      default: return (PRIORITIES[a.priority]?.order || 9) - (PRIORITIES[b.priority]?.order || 9)
+    }
+  })
+  return r
+}
+
+function ColumnHeader({ title, icon: Icon, iconColor, count, sort, setSort, search, setSearch, priority, setPriority }) {
+  const [open, setOpen] = useState(false)
+  const hasFilters = search || priority
+  return (
+    <div className="mb-2">
+      <div className="flex items-center gap-2 px-1">
+        <Icon size={13} className={iconColor} />
+        <span className="text-xs font-bold text-brand-text uppercase tracking-wide">{title}</span>
+        {count > 0 && <span className="ml-1 text-xs bg-brand-bg-2 text-brand-text-muted px-2 py-0.5 rounded-full border border-brand-border">{count}</span>}
+        <button onClick={() => setOpen(!open)}
+          className={`ml-auto flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${open || hasFilters ? 'bg-brand-orange text-white' : 'bg-brand-bg-2 text-brand-text-muted hover:bg-brand-bg-3'}`}>
+          <SlidersHorizontal size={11} />
+          {hasFilters ? 'Filtrado' : 'Filtrar'}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-2 bg-brand-bg-2 rounded-lg p-3 space-y-3 border border-brand-border animate-fade-in">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Filtrar</p>
+            <input type="text" placeholder="Buscar..." className="input-field text-xs py-1.5"
+              value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="relative">
+              <select className="select-field text-xs py-1.5 pr-7" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <option value="">Todas las urgencias</option>
+                <option value="urgent">Urgente</option>
+                <option value="important">Importante</option>
+                <option value="low">No urgente</option>
+              </select>
+              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
+            </div>
+          </div>
+          <div className="space-y-2 pt-2 border-t border-brand-border">
+            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Ordenar</p>
+            <div className="relative">
+              <select className="select-field text-xs py-1.5 pr-7" value={sort} onChange={(e) => setSort(e.target.value)}>
+                {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
+            </div>
+          </div>
+          {hasFilters && (
+            <button onClick={() => { setSearch(''); setPriority('') }} className="text-xs text-brand-text-muted hover:text-brand-text flex items-center gap-1">
+              <X size={11} /> Limpiar filtros
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function useColState() {
+  const [sort, setSort] = useState('priority')
+  const [search, setSearch] = useState('')
+  const [priority, setPriority] = useState('')
+  return { sort, setSort, search, setSearch, priority, setPriority }
+}
 
 function StatCard({ label, value, icon: Icon, color, bg }) {
   return (
@@ -26,32 +112,6 @@ function StatCard({ label, value, icon: Icon, color, bg }) {
   )
 }
 
-function MiniColumn({ title, icon: Icon, iconColor, tasks, users, onComplete, onEdit }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-2 px-1">
-        <Icon size={13} className={iconColor} />
-        <span className="text-xs font-bold text-brand-text uppercase tracking-wide">{title}</span>
-        {tasks.length > 0 && (
-          <span className="ml-auto text-xs bg-brand-bg-2 text-brand-text-muted px-2 py-0.5 rounded-full border border-brand-border">
-            {tasks.length}
-          </span>
-        )}
-      </div>
-      {tasks.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed border-brand-border py-6 text-center">
-          <p className="text-xs text-brand-text-light">Sin tareas</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} users={users} onComplete={onComplete} onEdit={onEdit} compact />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 export default function Dashboard() {
   const { myTasks } = useTasks()
@@ -60,6 +120,9 @@ export default function Dashboard() {
   const { users } = useUsers()
   const [activeView, setActiveView] = useState('today')
   const [editTask, setEditTask] = useState(null)
+  const normalCol = useColState()
+  const recurringCol = useColState()
+  const supervisionCol = useColState()
 
   const filterByView = (tasks, view) => {
     return tasks.filter((t) => {
@@ -119,12 +182,25 @@ export default function Dashboard() {
       if (task.type === 'recurring' && task.recurrence) {
         await completeAndRecur(task, currentUser.uid)
         toast.success('✓ Completada. Próxima recurrencia creada.')
+      } else if (task.verifiedBy && task.verifiedBy !== currentUser.uid) {
+        await updateTask(task.id, { status: 'pending_response' })
+        await createNotification({ recipientId: task.verifiedBy, taskId: task.id, taskTitle: task.title, type: 'completed', senderName: userProfile?.displayName })
+        toast.success('✓ Enviada a verificación')
       } else {
         await updateTask(task.id, { status: 'done' })
         toast.success('✓ Tarea finalizada')
       }
     } catch { toast.error('Error al completar la tarea') }
   }
+
+  const handleVerify = async (task) => {
+    try { await updateTask(task.id, { status: 'done' }); toast.success('✓ Verificada y cerrada') }
+    catch { toast.error('Error al verificar') }
+  }
+
+  const filteredNormal = useMemo(() => applyColumnFilter(normalTasks, normalCol.sort, normalCol.search, normalCol.priority), [normalTasks, normalCol.sort, normalCol.search, normalCol.priority])
+  const filteredRecurring = useMemo(() => applyColumnFilter(recurringTasks, recurringCol.sort, recurringCol.search, recurringCol.priority), [recurringTasks, recurringCol.sort, recurringCol.search, recurringCol.priority])
+  const filteredSupervision = useMemo(() => applyColumnFilter(supervisionTasks, supervisionCol.sort, supervisionCol.search, supervisionCol.priority), [supervisionTasks, supervisionCol.sort, supervisionCol.search, supervisionCol.priority])
 
   const VIEWS = [
     { key: 'today', label: 'Hoy', count: filterByView(myTasks.filter(t=>t.status!=='done'), 'today').length },
@@ -167,9 +243,36 @@ export default function Dashboard() {
 
         {/* 3 columnas */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <MiniColumn title="Tareas" icon={CheckSquare} iconColor="text-brand-orange" tasks={normalTasks} users={users} onComplete={handleComplete} onEdit={handleEdit} />
-          <MiniColumn title="Recurrentes" icon={RefreshCw} iconColor="text-blue-500" tasks={recurringTasks} users={users} onComplete={handleComplete} onEdit={handleEdit} />
-          <MiniColumn title="Supervisión" icon={Eye} iconColor="text-amber-500" tasks={supervisionTasks} users={users} onComplete={handleComplete} onEdit={null} />
+          <div>
+            <ColumnHeader title="Tareas" icon={CheckSquare} iconColor="text-brand-orange" count={filteredNormal.length} {...normalCol} />
+            <div className="space-y-2">
+              {filteredNormal.length === 0 ? <div className="rounded-xl border-2 border-dashed border-brand-border py-6 text-center"><p className="text-xs text-brand-text-light">Sin tareas</p></div>
+                : filteredNormal.map((t) => <TaskCard key={t.id} task={t} users={users} onComplete={handleComplete} onEdit={handleEdit} compact />)}
+            </div>
+          </div>
+          <div>
+            <ColumnHeader title="Recurrentes" icon={RefreshCw} iconColor="text-blue-500" count={filteredRecurring.length} {...recurringCol} />
+            <div className="space-y-2">
+              {filteredRecurring.length === 0 ? <div className="rounded-xl border-2 border-dashed border-brand-border py-6 text-center"><p className="text-xs text-brand-text-light">Sin recurrentes</p></div>
+                : filteredRecurring.map((t) => <TaskCard key={t.id} task={t} users={users} onComplete={handleComplete} onEdit={handleEdit} compact />)}
+            </div>
+          </div>
+          <div>
+            <ColumnHeader title="Supervisión" icon={Eye} iconColor="text-amber-500" count={filteredSupervision.length} {...supervisionCol} />
+            <div className="space-y-2">
+              {filteredSupervision.length === 0 ? <div className="rounded-xl border-2 border-dashed border-brand-border py-6 text-center"><p className="text-xs text-brand-text-light">Sin supervisión</p></div>
+                : filteredSupervision.map((t) => (
+                  <div key={t.id}>
+                    <TaskCard task={t} users={users} onComplete={t.status === 'pending_response' ? handleVerify : handleComplete} onEdit={null} compact />
+                    {t.status === 'pending_response' && (
+                      <button onClick={() => handleVerify(t)} className="w-full mt-1 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
+                        ✓ Verificar y cerrar
+                      </button>
+                    )}
+                  </div>
+                ))}
+            </div>
+          </div>
         </div>
       </div>
 
