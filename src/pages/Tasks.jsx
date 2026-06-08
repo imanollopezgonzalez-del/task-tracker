@@ -4,22 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/layout/Header'
 import TaskCard from '../components/tasks/TaskCard'
 import TaskModal from '../components/tasks/TaskModal'
-import EmptyState from '../components/ui/EmptyState'
-import { useUsers } from '../hooks/useUsers'
 import { PRIORITIES } from '../utils/constants'
-import { CheckSquare, Plus, RefreshCw, Eye, ChevronDown, SlidersHorizontal, X } from 'lucide-react'
 import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay } from 'date-fns'
+import { CheckSquare, Clock, AlertCircle, TrendingUp, RefreshCw, Eye, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
+import Avatar from '../components/ui/Avatar'
+import { useUsers } from '../hooks/useUsers'
 import { updateTask, completeAndRecur } from '../services/tasks'
 import { createNotification } from '../services/notifications'
 import toast from 'react-hot-toast'
-
-const TABS = [
-  { key: 'all', label: 'Todas' },
-  { key: 'today', label: 'Hoy' },
-  { key: 'weekly', label: 'Semanales' },
-  { key: 'monthly', label: 'Mensuales' },
-  { key: 'done', label: 'Completadas' },
-]
 
 const SORT_OPTS = [
   { value: 'priority', label: 'Urgencia' },
@@ -28,22 +20,37 @@ const SORT_OPTS = [
   { value: 'title', label: 'Nombre' },
 ]
 
-function filterByTab(tasks, tab) {
-  switch (tab) {
-    case 'today': return tasks.filter((t) => {
-      if (t.status === 'done') return false
+const VIEWS = [
+  { key: 'today', label: 'Hoy' },
+  { key: 'week', label: 'Esta semana' },
+  { key: 'month', label: 'Este mes' },
+  { key: 'done', label: 'Completadas' },
+]
+
+function filterByView(tasks, view) {
+  if (view === 'done') return tasks.filter((t) => t.status === 'done')
+  return tasks.filter((t) => {
+    if (t.status === 'done') return false
+    if (view === 'today') {
       if (!t.dueDate) return t.recurrence === 'daily'
       const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
       return isToday(d) || isBefore(d, startOfDay(new Date()))
-    })
-    case 'weekly': return tasks.filter((t) => t.status !== 'done' && (t.recurrence === 'weekly' || (t.dueDate && isThisWeek(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate), { weekStartsOn: 1 }))))
-    case 'monthly': return tasks.filter((t) => t.status !== 'done' && (t.recurrence === 'monthly' || (t.dueDate && isThisMonth(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)))))
-    case 'done': return tasks.filter((t) => t.status === 'done')
-    default: return tasks.filter((t) => t.status !== 'done')
-  }
+    }
+    if (view === 'week') {
+      if (!t.dueDate) return t.recurrence === 'weekly'
+      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
+      return isThisWeek(d, { weekStartsOn: 1 })
+    }
+    if (view === 'month') {
+      if (!t.dueDate) return t.recurrence === 'monthly'
+      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
+      return isThisMonth(d)
+    }
+    return false
+  })
 }
 
-function applySort(tasks, sort, search, priority) {
+function applyColumnFilter(tasks, sort, search, priority) {
   let r = [...tasks]
   if (search) { const q = search.toLowerCase(); r = r.filter((t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q)) }
   if (priority) r = r.filter((t) => t.priority === priority)
@@ -52,8 +59,8 @@ function applySort(tasks, sort, search, priority) {
       case 'priority': return (PRIORITIES[a.priority]?.order || 9) - (PRIORITIES[b.priority]?.order || 9)
       case 'dueDate': {
         const da = a.dueDate?.toDate ? a.dueDate.toDate() : a.dueDate ? new Date(a.dueDate) : new Date('9999')
-        const db = b.dueDate?.toDate ? b.dueDate.toDate() : b.dueDate ? new Date(b.dueDate) : new Date('9999')
-        return da - db
+        const db2 = b.dueDate?.toDate ? b.dueDate.toDate() : b.dueDate ? new Date(b.dueDate) : new Date('9999')
+        return da - db2
       }
       case 'status': return (a.status || '').localeCompare(b.status || '')
       case 'title': return a.title.localeCompare(b.title)
@@ -80,7 +87,6 @@ function ColumnHeader({ title, icon: Icon, iconColor, count, sort, setSort, sear
       </div>
       {open && (
         <div className="mt-2 bg-brand-bg-2 rounded-lg p-3 space-y-3 border border-brand-border animate-fade-in">
-          {/* Filtrar */}
           <div className="space-y-2">
             <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Filtrar</p>
             <input type="text" placeholder="Buscar por título..." className="input-field text-xs py-1.5"
@@ -95,19 +101,16 @@ function ColumnHeader({ title, icon: Icon, iconColor, count, sort, setSort, sear
               <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
             </div>
           </div>
-          {/* Ordenar */}
           <div className="space-y-2 pt-2 border-t border-brand-border">
             <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Ordenar</p>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+            <div className="relative">
               <select className="select-field text-xs py-1.5 pr-7" value={sort} onChange={(e) => setSort(e.target.value)}>
                 {SORT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
               <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
             </div>
           </div>
-          </div>
-          {(search || priority) && (
+          {hasFilters && (
             <button onClick={() => { setSearch(''); setPriority('') }} className="text-xs text-brand-text-muted hover:text-brand-text flex items-center gap-1">
               <X size={11} /> Limpiar filtros
             </button>
@@ -118,11 +121,25 @@ function ColumnHeader({ title, icon: Icon, iconColor, count, sort, setSort, sear
   )
 }
 
-function useColumnState() {
+function useColState() {
   const [sort, setSort] = useState('priority')
   const [search, setSearch] = useState('')
   const [priority, setPriority] = useState('')
   return { sort, setSort, search, setSearch, priority, setPriority }
+}
+
+function StatCard({ label, value, icon: Icon, color, bg }) {
+  return (
+    <div className="card p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+        <Icon size={20} className={color} />
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-brand-text leading-none">{value}</p>
+        <p className="text-xs text-brand-text-muted mt-0.5">{label}</p>
+      </div>
+    </div>
+  )
 }
 
 export default function Tasks() {
@@ -131,39 +148,59 @@ export default function Tasks() {
   const { users } = useUsers()
   const isAdmin = userProfile?.role === 'admin'
 
-  const [tab, setTab] = useState('all')
+  const [activeView, setActiveView] = useState('today')
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [selectedUid, setSelectedUid] = useState('me')
 
-  const normalState = useColumnState()
-  const recurringState = useColumnState()
-  const supervisionState = useColumnState()
+  const normalCol = useColState()
+  const recurringCol = useColState()
+  const supervisionCol = useColState()
 
-  const viewUid = useMemo(() => {
-    if (!isAdmin) return currentUser?.uid
-    return selectedUid === 'me' ? currentUser?.uid : selectedUid === 'all' ? null : selectedUid
-  }, [isAdmin, selectedUid, currentUser])
-
-  const source = useMemo(() => {
+  const sourceTasks = useMemo(() => {
     if (!isAdmin) return myTasks
     if (selectedUid === 'all') return allTasks
     const uid = selectedUid === 'me' ? currentUser?.uid : selectedUid
     return allTasks.filter((t) => t.assignedTo === uid || t.verifiedBy === uid)
   }, [isAdmin, allTasks, myTasks, selectedUid, currentUser])
 
-  const tabFiltered = useMemo(() => filterByTab(source, tab), [source, tab])
+  const viewUid = useMemo(() => {
+    if (!isAdmin) return currentUser?.uid
+    return selectedUid === 'me' ? currentUser?.uid : selectedUid === 'all' ? null : selectedUid
+  }, [isAdmin, selectedUid, currentUser])
+
+  const viewTasks = useMemo(() => filterByView(sourceTasks, activeView), [sourceTasks, activeView])
 
   const { normalTasks, recurringTasks, supervisionTasks } = useMemo(() => {
     const uid = viewUid || ''
     const normal = [], recurring = [], supervision = []
-    tabFiltered.forEach((t) => {
+    viewTasks.forEach((t) => {
       if (t.verifiedBy === uid && t.assignedTo !== uid) supervision.push(t)
       else if (t.type === 'recurring') recurring.push(t)
       else normal.push(t)
     })
-    return { normalTasks: normal, recurringTasks: recurring, supervisionTasks: supervision }
-  }, [tabFiltered, viewUid])
+    const byPriority = (arr) => [...arr].sort((a, b) => (PRIORITIES[a.priority]?.order || 9) - (PRIORITIES[b.priority]?.order || 9))
+    return { normalTasks: byPriority(normal), recurringTasks: byPriority(recurring), supervisionTasks: byPriority(supervision) }
+  }, [viewTasks, viewUid])
+
+  const stats = useMemo(() => {
+    const base = isAdmin && selectedUid !== 'me' ? sourceTasks : myTasks
+    const done = base.filter((t) => t.status === 'done').length
+    const inProgress = base.filter((t) => t.status === 'in_progress').length
+    const overdue = base.filter((t) => {
+      if (t.status === 'done' || !t.dueDate) return false
+      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
+      return isBefore(d, startOfDay(new Date()))
+    }).length
+    const urgent = base.filter((t) => t.priority === 'urgent' && t.status !== 'done').length
+    return { done, inProgress, overdue, urgent }
+  }, [myTasks, sourceTasks, isAdmin, selectedUid])
+
+  const viewCounts = useMemo(() => Object.fromEntries(VIEWS.map(({ key }) => [key, filterByView(sourceTasks, key).length])), [sourceTasks])
+
+  const filteredNormal = useMemo(() => applyColumnFilter(normalTasks, normalCol.sort, normalCol.search, normalCol.priority), [normalTasks, normalCol.sort, normalCol.search, normalCol.priority])
+  const filteredRecurring = useMemo(() => applyColumnFilter(recurringTasks, recurringCol.sort, recurringCol.search, recurringCol.priority), [recurringTasks, recurringCol.sort, recurringCol.search, recurringCol.priority])
+  const filteredSupervision = useMemo(() => applyColumnFilter(supervisionTasks, supervisionCol.sort, supervisionCol.search, supervisionCol.priority), [supervisionTasks, supervisionCol.sort, supervisionCol.search, supervisionCol.priority])
 
   const handleEdit = (task) => { setEditTask(task); setShowModal(true) }
   const handleClose = () => { setShowModal(false); setEditTask(null) }
@@ -174,7 +211,6 @@ export default function Tasks() {
         await completeAndRecur(task, currentUser.uid)
         toast.success('✓ Completada. Próxima recurrencia creada.')
       } else if (task.verifiedBy && task.verifiedBy !== currentUser.uid) {
-        // Tiene verificador → pasa a "Pend. Verificación"
         await updateTask(task.id, { status: 'pending_response' })
         await createNotification({ recipientId: task.verifiedBy, taskId: task.id, taskTitle: task.title, type: 'completed', senderName: userProfile?.displayName })
         toast.success('✓ Enviada a verificación')
@@ -186,24 +222,35 @@ export default function Tasks() {
   }
 
   const handleVerify = async (task) => {
-    try {
-      await updateTask(task.id, { status: 'done' })
-      toast.success('✓ Tarea verificada y cerrada')
-    } catch { toast.error('Error al verificar') }
+    try { await updateTask(task.id, { status: 'done' }); toast.success('✓ Verificada y cerrada') }
+    catch { toast.error('Error al verificar') }
   }
 
   const canEdit = (task) => isAdmin || task.assignedTo === currentUser?.uid
 
-  const tabCounts = useMemo(() => Object.fromEntries(TABS.map(({ key }) => [key, filterByTab(source, key).length])), [source])
-
-  const filteredNormal = useMemo(() => applySort(normalTasks, normalState.sort, normalState.search, normalState.priority), [normalTasks, normalState.sort, normalState.search, normalState.priority])
-  const filteredRecurring = useMemo(() => applySort(recurringTasks, recurringState.sort, recurringState.search, recurringState.priority), [recurringTasks, recurringState.sort, recurringState.search, recurringState.priority])
-  const filteredSupervision = useMemo(() => applySort(supervisionTasks, supervisionState.sort, supervisionState.search, supervisionState.priority), [supervisionTasks, supervisionState.sort, supervisionState.search, supervisionState.priority])
-
   return (
     <div>
-      <Header title={isAdmin ? 'Tareas del equipo' : 'Mis Tareas'} action={{ label: 'Nueva tarea', onClick: () => setShowModal(true) }} />
-      <div className="px-4 lg:px-6 py-5 space-y-4 max-w-6xl">
+      <Header title="Tareas" action={{ label: 'Nueva tarea', onClick: () => setShowModal(true) }} />
+      <div className="px-4 lg:px-6 py-5 space-y-5 max-w-6xl">
+
+        {!isAdmin && (
+          <div className="flex items-center gap-3">
+            <Avatar name={userProfile?.displayName} size="md" />
+            <div>
+              <h2 className="text-base font-bold text-brand-text">Hola, {userProfile?.displayName?.split(' ')[0]} 👋</h2>
+              <p className="text-xs text-brand-text-muted">
+                {new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard label="Completadas" value={stats.done} icon={CheckSquare} color="text-green-600" bg="bg-green-50" />
+          <StatCard label="En curso" value={stats.inProgress} icon={Clock} color="text-blue-600" bg="bg-blue-50" />
+          <StatCard label="Vencidas" value={stats.overdue} icon={AlertCircle} color="text-red-600" bg="bg-red-50" />
+          <StatCard label="Urgentes" value={stats.urgent} icon={TrendingUp} color="text-brand-orange" bg="bg-brand-orange-light" />
+        </div>
 
         {isAdmin && (
           <div className="flex items-center gap-2">
@@ -213,7 +260,7 @@ export default function Tasks() {
                 className="select-field pr-8 py-1.5 text-sm pl-3 min-w-44 font-medium">
                 <option value="me">Mis tareas</option>
                 <option value="all">Todo el equipo</option>
-                {users.filter(u => u.uid !== currentUser?.uid).map((u) => (
+                {users.filter((u) => u.uid !== currentUser?.uid).map((u) => (
                   <option key={u.uid} value={u.uid}>{u.displayName || u.email}</option>
                 ))}
               </select>
@@ -222,25 +269,27 @@ export default function Tasks() {
           </div>
         )}
 
-        <div className="flex gap-1 overflow-x-auto pb-1">
-          {TABS.map(({ key, label }) => (
-            <button key={key} onClick={() => setTab(key)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${tab === key ? 'bg-brand-dark text-white' : 'bg-brand-bg-2 text-brand-text-muted hover:bg-brand-bg-3'}`}>
+        <div className="flex gap-1 bg-brand-bg-2 p-1 rounded-xl w-fit">
+          {VIEWS.map(({ key, label }) => (
+            <button key={key} onClick={() => setActiveView(key)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${activeView === key ? 'bg-white shadow-card text-brand-text' : 'text-brand-text-muted hover:text-brand-text'}`}>
               {label}
-              {tabCounts[key] > 0 && <span className={`px-1.5 py-0.5 rounded-full text-xs ${tab === key ? 'bg-white/20' : 'bg-brand-border text-brand-text-muted'}`}>{tabCounts[key]}</span>}
+              {viewCounts[key] > 0 && (
+                <span className={`px-1.5 py-0.5 rounded-full text-xs ${activeView === key ? 'bg-brand-orange text-white' : 'bg-brand-border text-brand-text-muted'}`}>
+                  {viewCounts[key]}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Columna Tareas */}
           <div>
-            <ColumnHeader title="Tareas" icon={CheckSquare} iconColor="text-brand-orange" count={filteredNormal.length} {...normalState} />
+            <ColumnHeader title="Tareas" icon={CheckSquare} iconColor="text-brand-orange" count={filteredNormal.length} {...normalCol} />
             <div className="space-y-2">
               {filteredNormal.length === 0 ? (
                 <div className="rounded-xl border-2 border-dashed border-brand-border py-8 text-center">
                   <p className="text-xs text-brand-text-light">Sin tareas</p>
-                  {tab === 'all' && isAdmin && <button onClick={() => setShowModal(true)} className="mt-2 btn-ghost text-xs py-1"><Plus size={12} /> Nueva</button>}
                 </div>
               ) : filteredNormal.map((task) => (
                 <TaskCard key={task.id} task={task} users={users} onEdit={canEdit(task) ? handleEdit : null} onComplete={handleComplete} />
@@ -248,9 +297,8 @@ export default function Tasks() {
             </div>
           </div>
 
-          {/* Columna Recurrentes */}
           <div>
-            <ColumnHeader title="Recurrentes" icon={RefreshCw} iconColor="text-blue-500" count={filteredRecurring.length} {...recurringState} />
+            <ColumnHeader title="Recurrentes" icon={RefreshCw} iconColor="text-blue-500" count={filteredRecurring.length} {...recurringCol} />
             <div className="space-y-2">
               {filteredRecurring.length === 0 ? (
                 <div className="rounded-xl border-2 border-dashed border-brand-border py-8 text-center">
@@ -262,22 +310,21 @@ export default function Tasks() {
             </div>
           </div>
 
-          {/* Columna Supervisión */}
           <div>
-            <ColumnHeader title="Supervisión" icon={Eye} iconColor="text-amber-500" count={filteredSupervision.length} {...supervisionState} />
+            <ColumnHeader title="Supervisión" icon={Eye} iconColor="text-amber-500" count={filteredSupervision.length} {...supervisionCol} />
             <div className="space-y-2">
               {filteredSupervision.length === 0 ? (
                 <div className="rounded-xl border-2 border-dashed border-brand-border py-8 text-center">
-                  <p className="text-xs text-brand-text-light">Sin tareas a supervisar</p>
+                  <p className="text-xs text-brand-text-light">Sin supervisión</p>
                 </div>
               ) : filteredSupervision.map((task) => (
                 <div key={task.id}>
                   <TaskCard task={task} users={users} onEdit={isAdmin ? handleEdit : null}
-                    onComplete={task.status === 'pending_response' ? handleVerify : null} />
+                    onComplete={task.status === 'pending_response' ? handleVerify : handleComplete} />
                   {task.status === 'pending_response' && (
                     <button onClick={() => handleVerify(task)}
                       className="w-full mt-1 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-                      ✓ Verificar y cerrar tarea
+                      ✓ Verificar y cerrar
                     </button>
                   )}
                 </div>

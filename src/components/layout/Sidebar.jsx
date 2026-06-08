@@ -1,18 +1,17 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X } from 'lucide-react'
+import { CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from 'react'
 import Avatar from '../ui/Avatar'
 import toast from 'react-hot-toast'
 
 const MEMBER_NAV = [
-  { to: '/', icon: CheckSquare, label: 'Mis Tareas', end: true },
+  { to: '/tasks', icon: CheckSquare, label: 'Tareas', end: true },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
 ]
 
 const ADMIN_NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'Inicio', end: true },
-  { to: '/tasks', icon: CheckSquare, label: 'Tareas del equipo' },
+  { to: '/tasks', icon: CheckSquare, label: 'Tareas', end: true },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/kpi', icon: BarChart3, label: 'KPIs & Métricas' },
   { to: '/admin', icon: Users, label: 'Equipo' },

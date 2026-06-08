@@ -5,7 +5,6 @@ import { NotificationProvider } from './contexts/NotificationContext'
 import { TaskProvider } from './contexts/TaskContext'
 import Layout from './components/layout/Layout'
 import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
 import Tasks from './pages/Tasks'
 import TaskDetail from './pages/TaskDetail'
 import KPI from './pages/KPI'
@@ -35,8 +34,8 @@ function AppRoutes() {
   const { currentUser } = useAuth()
   return (
     <Routes>
-      <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/login" element={currentUser ? <Navigate to="/tasks" replace /> : <Login />} />
+      <Route path="/" element={<Navigate to="/tasks" replace />} />
       <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
       <Route path="/all-tasks" element={<Navigate to="/tasks" replace />} />
       <Route path="/tasks/:id" element={<ProtectedRoute><TaskDetail /></ProtectedRoute>} />
@@ -44,7 +43,7 @@ function AppRoutes() {
       <Route path="/calendar" element={<ProtectedRoute><CalendarView /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/tasks" replace />} />
     </Routes>
   )
 }
