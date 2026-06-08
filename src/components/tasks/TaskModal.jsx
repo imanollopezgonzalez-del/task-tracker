@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react'
 import Modal from '../ui/Modal'
-import { PRIORITIES, STATUSES, RECURRENCES } from '../../utils/constants'
+import { PRIORITIES, STATUSES } from '../../utils/constants'
 import { createTask, updateTask, addComment } from '../../services/tasks'
 import { createNotification } from '../../services/notifications'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTasks } from '../../contexts/TaskContext'
 import { toInputDate } from '../../utils/dates'
+import RecurrencePicker from './RecurrencePicker'
 import toast from 'react-hot-toast'
 import Spinner from '../ui/Spinner'
 import { ChevronDown } from 'lucide-react'
 
 const EMPTY = {
   title: '', description: '', priority: 'important', status: 'not_started',
-  type: 'single', recurrence: 'weekly', assignedTo: '', verifiedBy: '',
-  dueDate: '', startDate: '', observation: '',
+  type: 'single', recurrence: 'weekly', recurrenceConfig: {},
+  assignedTo: '', verifiedBy: '', dueDate: '', startDate: '', observation: '',
 }
 
 export default function TaskModal({ isOpen, onClose, task, users = [] }) {
@@ -32,6 +33,7 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
         status: task.status || 'not_started',
         type: task.type || 'single',
         recurrence: task.recurrence || 'weekly',
+        recurrenceConfig: task.recurrenceConfig || {},
         assignedTo: task.assignedTo || '',
         verifiedBy: task.verifiedBy || '',
         dueDate: toInputDate(task.dueDate),
@@ -56,6 +58,7 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
         ...rest,
         companyId,
         recurrence: form.type === 'recurring' ? form.recurrence : null,
+        recurrenceConfig: form.type === 'recurring' ? (form.recurrenceConfig || {}) : null,
       }
       if (!isEdit) {
         const taskId = await createTask(data, currentUser.uid)
@@ -142,28 +145,24 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="label">Tipo de tarea</label>
-            <div className="flex gap-1 bg-brand-bg-2 p-1 rounded-lg">
-              {[['single', 'Única'], ['recurring', 'Recurrente']].map(([v, l]) => (
-                <button key={v} type="button" onClick={() => set('type', v)}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${form.type === v ? 'bg-white shadow-card text-brand-text' : 'text-brand-text-muted'}`}>
-                  {l}
-                </button>
-              ))}
-            </div>
+        {/* Tipo de tarea */}
+        <div>
+          <label className="label">Tipo de tarea</label>
+          <div className="flex gap-1 bg-brand-bg-2 p-1 rounded-lg mb-3">
+            {[['single', 'Tarea única'], ['recurring', 'Tarea recurrente']].map(([v, l]) => (
+              <button key={v} type="button" onClick={() => set('type', v)}
+                className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${form.type === v ? 'bg-white shadow-card text-brand-text' : 'text-brand-text-muted'}`}>
+                {l}
+              </button>
+            ))}
           </div>
           {form.type === 'recurring' && (
-            <div>
-              <label className="label">Repetición</label>
-              <div className="relative">
-                <select className="select-field pr-8" value={form.recurrence} onChange={(e) => set('recurrence', e.target.value)}>
-                  {Object.entries(RECURRENCES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
-                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none" />
-              </div>
-            </div>
+            <RecurrencePicker
+              recurrence={form.recurrence}
+              config={form.recurrenceConfig}
+              onChange={(v) => set('recurrence', v)}
+              onConfigChange={(v) => set('recurrenceConfig', v)}
+            />
           )}
         </div>
 

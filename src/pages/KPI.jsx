@@ -51,11 +51,14 @@ export default function KPI() {
   const stats = useMemo(() => {
     const done = allTasks.filter((t) => t.status === 'done')
     const active = allTasks.filter((t) => t.status !== 'done')
+    const withVerifier = allTasks.filter((t) => t.verifiedBy)
+    const verifiedDone = done.filter((t) => t.verifiedBy)
+    const pendingVerification = allTasks.filter((t) => t.status === 'pending_response' && t.verifiedBy)
     const thisWeek = done.filter((t) => t.completedAt && isThisWeek(t.completedAt.toDate ? t.completedAt.toDate() : new Date(t.completedAt), { weekStartsOn: 1 }))
     const thisMonth = done.filter((t) => t.completedAt && isThisMonth(t.completedAt.toDate ? t.completedAt.toDate() : new Date(t.completedAt)))
     const thisYear = done.filter((t) => t.completedAt && isThisYear(t.completedAt.toDate ? t.completedAt.toDate() : new Date(t.completedAt)))
     const rate = allTasks.length ? Math.round((done.length / allTasks.length) * 100) : 0
-    return { done, active, thisWeek, thisMonth, thisYear, rate, total: allTasks.length }
+    return { done, active, thisWeek, thisMonth, thisYear, rate, total: allTasks.length, withVerifier: withVerifier.length, verifiedDone: verifiedDone.length, pendingVerification: pendingVerification.length }
   }, [allTasks])
 
   const priorityData = useMemo(() => Object.entries(PRIORITIES).map(([k, v]) => ({
@@ -99,8 +102,10 @@ export default function KPI() {
   const userStats = useMemo(() => users.map((u) => {
     const assigned = allTasks.filter((t) => t.assignedTo === u.uid)
     const done = assigned.filter((t) => t.status === 'done')
+    const supervising = allTasks.filter((t) => t.verifiedBy === u.uid && t.assignedTo !== u.uid)
+    const supervisedDone = supervising.filter((t) => t.status === 'done')
     const rate = assigned.length ? Math.round((done.length / assigned.length) * 100) : 0
-    return { ...u, assigned: assigned.length, done: done.length, rate }
+    return { ...u, assigned: assigned.length, done: done.length, rate, supervising: supervising.length, supervisedDone: supervisedDone.length }
   }).sort((a, b) => b.done - a.done), [allTasks, users])
 
   return (
@@ -113,6 +118,12 @@ export default function KPI() {
           <KPICard label="Completadas" value={stats.done.length} sub="de todas" color="text-green-600" />
           <KPICard label="Tasa completado" value={`${stats.rate}%`} sub="del total" color={stats.rate >= 70 ? 'text-green-600' : stats.rate >= 40 ? 'text-amber-600' : 'text-red-600'} />
           <KPICard label="Esta semana" value={stats.thisWeek.length} sub="completadas" color="text-brand-orange" />
+        </div>
+        {/* Supervisión KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          <KPICard label="Con supervisión" value={stats.withVerifier} sub="tareas con verificador" />
+          <KPICard label="Verificadas" value={stats.verifiedDone} sub="completadas + verificadas" color="text-emerald-600" />
+          <KPICard label="Pend. verificar" value={stats.pendingVerification} sub="esperando confirmación" color="text-amber-600" />
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <KPICard label="Este mes" value={stats.thisMonth.length} sub="completadas" />
@@ -191,7 +202,7 @@ export default function KPI() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-semibold text-brand-text truncate">{u.displayName || u.email}</span>
-                    <span className="text-xs text-brand-text-muted">{u.done}/{u.assigned} · {u.rate}%</span>
+                    <span className="text-xs text-brand-text-muted">{u.done}/{u.assigned} · {u.rate}% · 👁{u.supervisedDone}/{u.supervising}</span>
                   </div>
                   <div className="w-full bg-brand-bg-2 rounded-full h-1.5">
                     <div className="h-1.5 rounded-full bg-brand-orange transition-all" style={{ width: `${u.rate}%` }} />

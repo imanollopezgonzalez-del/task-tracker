@@ -66,8 +66,8 @@ export default function Login() {
     <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500 rounded-2xl mb-4 shadow-lg shadow-emerald-500/30">
-            <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8"><path d="M4 13l5.5 5.5L20 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-orange rounded-2xl mb-4 shadow-lg shadow-brand-orange/20">
+            <svg viewBox="0 0 24 24" fill="none" className="w-7 h-7"><path d="M9 11l3 3L22 4" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-brand-text">Gestión de Tareas</h1>
           <p className="text-sm text-brand-text-muted mt-1">Pollo Cocido & Pastas Pariggi</p>

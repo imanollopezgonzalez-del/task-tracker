@@ -100,10 +100,31 @@ export const completeAndRecur = async (task, userId) => {
         : new Date()
 
     let nextDate
+    const cfg = task.recurrenceConfig || {}
     switch (task.recurrence) {
-      case 'daily': nextDate = addDays(base, 1); break
-      case 'weekly': nextDate = addWeeks(base, 1); break
-      case 'monthly': nextDate = addMonths(base, 1); break
+      case 'daily': {
+        const every = cfg.every || 1
+        nextDate = addDays(base, every)
+        break
+      }
+      case 'weekly': {
+        // Si hay días específicos, buscar el siguiente día configurado
+        const days = cfg.days?.length ? cfg.days : [1, 2, 3, 4, 5]
+        let candidate = addDays(base, 1)
+        for (let i = 0; i < 8; i++) {
+          if (days.includes(candidate.getDay())) { nextDate = candidate; break }
+          candidate = addDays(candidate, 1)
+        }
+        if (!nextDate) nextDate = addWeeks(base, 1)
+        break
+      }
+      case 'monthly': {
+        const dayOfMonth = cfg.dayOfMonth || base.getDate()
+        const nm = addMonths(base, 1)
+        nm.setDate(Math.min(dayOfMonth, new Date(nm.getFullYear(), nm.getMonth() + 1, 0).getDate()))
+        nextDate = nm
+        break
+      }
       case 'annual': nextDate = addYears(base, 1); break
       default: nextDate = addDays(base, 1)
     }
