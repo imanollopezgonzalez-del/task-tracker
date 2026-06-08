@@ -15,19 +15,17 @@ export const buildUserEmail = (username) => {
 
 export const createUserProfile = async (user, extra = {}) => {
   const ref = doc(db, 'users', user.uid)
-  const snap = await getDoc(ref)
-  if (!snap.exists()) {
-    await setDoc(ref, {
-      uid: user.uid,
-      email: user.email,
-      displayName: extra.displayName || user.displayName || user.email.split('@')[0],
-      role: extra.role || 'employee',
-      companyId: extra.companyId || null,
-      fcmToken: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-  }
+  // Siempre sobreescribir con los datos correctos (evita datos stale de onAuthStateChanged)
+  await setDoc(ref, {
+    uid: user.uid,
+    email: user.email,
+    displayName: extra.displayName || user.displayName || user.email.split('@')[0],
+    role: extra.role || 'member',
+    companyId: extra.companyId || null,
+    fcmToken: null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  }, { merge: true })
   return (await getDoc(ref)).data()
 }
 
@@ -66,8 +64,8 @@ export const createCompany = async (name, ownerUid) => {
 
 export const joinCompany = async (uid, companyId) => {
   const snap = await getDoc(doc(db, 'companies', companyId))
-  if (!snap.exists()) throw new Error('Empresa no encontrada')
-  await updateDoc(doc(db, 'users', uid), { companyId, role: 'employee', updatedAt: serverTimestamp() })
+  if (!snap.exists()) throw new Error('Código de empresa incorrecto')
+  await updateDoc(doc(db, 'users', uid), { companyId, role: 'member', updatedAt: serverTimestamp() })
 }
 
 export const getCompany = async (companyId) => {

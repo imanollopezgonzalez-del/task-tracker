@@ -101,7 +101,7 @@ export default function Settings() {
               <p className="text-sm font-bold text-brand-text">{userProfile?.displayName}</p>
               <p className="text-xs text-brand-text-muted">{isUsingPinLogin ? 'Acceso con PIN ✓' : currentUser?.email}</p>
               <span className={`mt-1 badge text-xs ${userProfile?.role === 'admin' ? 'bg-brand-orange-light text-brand-orange border border-brand-orange/20' : 'bg-brand-bg-2 text-brand-text-muted border border-brand-border'}`}>
-                {userProfile?.role === 'admin' ? <><Shield size={10} /> Administrador</> : <><User size={10} /> Empleado</>}
+                {userProfile?.role === 'admin' ? <><Shield size={10} /> Administrador</> : <><User size={10} /> Colaborador</>}
               </span>
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function Settings() {
               <h3 className="text-sm font-semibold text-brand-text">Código de empresa</h3>
             </div>
             <p className="text-xs text-brand-text-muted mb-2">
-              Comparte este código con tus empleados para que puedan registrarse:
+              Comparte este código con tu equipo para que puedan registrarse:
             </p>
             <div className="flex gap-2">
               <code className="flex-1 px-3 py-2 bg-brand-bg-2 rounded-lg text-xs font-mono text-brand-text border border-brand-border break-all">

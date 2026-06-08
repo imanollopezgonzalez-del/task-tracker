@@ -35,9 +35,9 @@ export default function Admin() {
 
   const toggleRole = async (uid, currentRole) => {
     if (uid === userProfile.uid) return toast.error('No puedes cambiar tu propio rol')
-    const newRole = currentRole === 'admin' ? 'employee' : 'admin'
+    const newRole = currentRole === 'admin' ? 'member' : 'admin'
     await updateUserProfile(uid, { role: newRole })
-    toast.success(`Rol actualizado a ${newRole === 'admin' ? 'Administrador' : 'Empleado'}`)
+    toast.success(`Rol actualizado a ${newRole === 'admin' ? 'Administrador' : 'Colaborador'}`)
   }
 
   return (
@@ -48,7 +48,7 @@ export default function Admin() {
         <div className="card p-5">
           <h3 className="text-sm font-semibold text-brand-text mb-3">Empresa</h3>
           <p className="text-base font-bold text-brand-text mb-1">{company?.name || 'Sin nombre'}</p>
-          <p className="text-xs text-brand-text-muted mb-3">Comparte este ID para que tus empleados puedan unirse al crear su cuenta:</p>
+          <p className="text-xs text-brand-text-muted mb-3">Comparte este código con tu equipo para que puedan unirse al registrarse:</p>
           <div className="flex items-center gap-2">
             <code className="flex-1 px-3 py-2 bg-brand-bg-2 rounded-lg text-xs text-brand-text font-mono border border-brand-border truncate">
               {userProfile?.companyId}
@@ -80,7 +80,7 @@ export default function Admin() {
                   {u.uid !== userProfile.uid && (
                     <button onClick={() => toggleRole(u.uid, u.role)}
                       className="text-xs text-brand-text-muted hover:text-brand-orange font-medium transition-colors flex-shrink-0 flex items-center gap-1">
-                      {u.role === 'admin' ? <><User size={12} /> Hacer empleado</> : <><ShieldCheck size={12} /> Hacer admin</>}
+                      {u.role === 'admin' ? <><User size={12} /> Quitar admin</> : <><ShieldCheck size={12} /> Hacer admin</>}
                     </button>
                   )}
                   {u.uid === userProfile.uid && (

@@ -1,27 +1,28 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { auth } from '../firebase'
 import {
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   signOut, onAuthStateChanged, updateProfile,
 } from 'firebase/auth'
-import { createUserProfile, getUserProfile } from '../services/users'
+import { createUserProfile, getUserProfile, createCompany, joinCompany } from '../services/users'
 
 const AuthContext = createContext(null)
-
 export const useAuth = () => useContext(AuthContext)
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  // Flag para evitar que onAuthStateChanged sobreescriba el perfil durante registro
+  const registeringRef = useRef(false)
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
-      if (user) {
+      if (user && !registeringRef.current) {
         const profile = await getUserProfile(user.uid)
         setUserProfile(profile)
-      } else {
+      } else if (!user) {
         setUserProfile(null)
       }
       setLoading(false)
@@ -29,12 +30,31 @@ export function AuthProvider({ children }) {
     return unsub
   }, [])
 
-  const register = async (email, password, displayName, companyData) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password)
-    await updateProfile(cred.user, { displayName })
-    const profile = await createUserProfile(cred.user, { displayName, ...companyData })
-    setUserProfile(profile)
-    return cred.user
+  // register maneja todo en secuencia: crear usuario → empresa → perfil con rol correcto
+  const register = async (email, password, displayName, companyCode) => {
+    registeringRef.current = true
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password)
+      await updateProfile(cred.user, { displayName })
+
+      let role = 'member'
+      let companyId = null
+
+      if (companyCode?.trim()) {
+        await joinCompany(cred.user.uid, companyCode.trim())
+        companyId = companyCode.trim()
+      } else {
+        companyId = await createCompany('Mi Empresa', cred.user.uid)
+        role = 'admin'
+      }
+
+      await createUserProfile(cred.user, { displayName, role, companyId })
+      const profile = await getUserProfile(cred.user.uid)
+      setUserProfile(profile)
+      return cred.user
+    } finally {
+      registeringRef.current = false
+    }
   }
 
   const login = async (email, password) => {

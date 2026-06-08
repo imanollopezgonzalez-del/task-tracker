@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { createCompany, joinCompany, buildUserEmail } from '../services/users'
+import { buildUserEmail } from '../services/users'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff, CheckSquare, AlertCircle } from 'lucide-react'
 import Spinner from '../components/ui/Spinner'
@@ -11,25 +11,24 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
   const [username, setUsername] = useState('')
   const [pin, setPin] = useState('')
   const [companyCode, setCompanyCode] = useState('')
 
-  const { login, register, refreshProfile } = useAuth()
+  const { login, register } = useAuth()
   const navigate = useNavigate()
 
   const clear = () => setError('')
 
-  const getErrorMsg = (code) => {
+  const getErrorMsg = (code, message) => {
     switch (code) {
       case 'auth/invalid-credential':
       case 'auth/wrong-password':
       case 'auth/user-not-found': return 'Usuario o PIN incorrecto'
       case 'auth/too-many-requests': return 'Demasiados intentos. Espera unos minutos.'
-      case 'auth/email-already-in-use': return 'Ese nombre de usuario ya existe. Elige otro.'
+      case 'auth/email-already-in-use': return 'Ese nombre ya existe. Elige otro.'
       case 'auth/network-request-failed': return 'Sin conexión. Revisa tu internet.'
-      default: return 'Algo salió mal. Inténtalo de nuevo.'
+      default: return message || 'Algo salió mal. Inténtalo de nuevo.'
     }
   }
 
@@ -43,7 +42,7 @@ export default function Login() {
       await login(buildUserEmail(username), pin)
       navigate('/')
     } catch (err) {
-      setError(getErrorMsg(err.code))
+      setError(getErrorMsg(err.code, err.message))
     } finally { setLoading(false) }
   }
 
@@ -51,20 +50,15 @@ export default function Login() {
     e.preventDefault()
     clear()
     if (!username.trim()) { setError('Escribe tu nombre'); return }
-    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setError('El PIN debe ser 6 dígitos numéricos'); return }
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setError('El PIN debe ser exactamente 6 dígitos numéricos'); return }
     setLoading(true)
     try {
-      const user = await register(buildUserEmail(username), pin, username)
-      if (companyCode.trim()) {
-        await joinCompany(user.uid, companyCode.trim())
-      } else {
-        await createCompany('Mi Empresa', user.uid)
-      }
-      await refreshProfile()
+      // AuthContext maneja todo: crear usuario, empresa y rol correcto
+      await register(buildUserEmail(username), pin, username, companyCode.trim() || null)
       navigate('/')
       toast.success(`¡Bienvenido, ${username}!`)
     } catch (err) {
-      setError(getErrorMsg(err.code))
+      setError(getErrorMsg(err.code, err.message))
     } finally { setLoading(false) }
   }
 
@@ -106,15 +100,9 @@ export default function Login() {
               <div>
                 <label className="label">PIN <span className="normal-case font-normal text-brand-text-light">(6 dígitos)</span></label>
                 <div className="relative">
-                  <input
-                    type={showPwd ? 'text' : 'password'}
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="input-field pr-10 tracking-widest text-xl text-center"
-                    placeholder="······"
-                    value={pin}
-                    onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }}
-                  />
+                  <input type={showPwd ? 'text' : 'password'} inputMode="numeric" maxLength={6}
+                    className="input-field pr-10 tracking-widest text-xl text-center" placeholder="······"
+                    value={pin} onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }} />
                   <button type="button" onClick={() => setShowPwd(!showPwd)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-brand-text">
                     {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -135,15 +123,9 @@ export default function Login() {
               <div>
                 <label className="label">PIN <span className="normal-case font-normal text-brand-text-light">(6 dígitos)</span></label>
                 <div className="relative">
-                  <input
-                    type={showPwd ? 'text' : 'password'}
-                    inputMode="numeric"
-                    maxLength={6}
-                    className="input-field pr-10 tracking-widest text-xl text-center"
-                    placeholder="······"
-                    value={pin}
-                    onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }}
-                  />
+                  <input type={showPwd ? 'text' : 'password'} inputMode="numeric" maxLength={6}
+                    className="input-field pr-10 tracking-widest text-xl text-center" placeholder="······"
+                    value={pin} onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }} />
                   <button type="button" onClick={() => setShowPwd(!showPwd)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-brand-text">
                     {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}

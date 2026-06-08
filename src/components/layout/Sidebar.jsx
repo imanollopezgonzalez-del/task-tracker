@@ -5,7 +5,7 @@ import { useState } from 'react'
 import Avatar from '../ui/Avatar'
 import toast from 'react-hot-toast'
 
-const EMPLOYEE_NAV = [
+const MEMBER_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Inicio', end: true },
   { to: '/tasks', icon: CheckSquare, label: 'Mis Tareas' },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
@@ -24,7 +24,7 @@ function SidebarContent({ onClose }) {
   const { userProfile, logout } = useAuth()
   const navigate = useNavigate()
   const isAdmin = userProfile?.role === 'admin'
-  const navItems = isAdmin ? ADMIN_NAV : EMPLOYEE_NAV
+  const navItems = isAdmin ? ADMIN_NAV : MEMBER_NAV
 
   const handleLogout = async () => {
     await logout()
@@ -66,7 +66,7 @@ function SidebarContent({ onClose }) {
           <Avatar name={userProfile?.displayName} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="text-white text-xs font-medium truncate">{userProfile?.displayName}</p>
-            <p className="text-white/50 text-xs">{isAdmin ? 'Administrador' : 'Empleado'}</p>
+            <p className="text-white/50 text-xs">{isAdmin ? 'Administrador' : 'Colaborador'}</p>
           </div>
         </div>
         <button onClick={handleLogout} className="sidebar-item sidebar-item-inactive w-full">
