@@ -38,7 +38,7 @@ function AppRoutes() {
       <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
-      <Route path="/all-tasks" element={<ProtectedRoute><Tasks showAll /></ProtectedRoute>} />
+      <Route path="/all-tasks" element={<Navigate to="/tasks" replace />} />
       <Route path="/tasks/:id" element={<ProtectedRoute><TaskDetail /></ProtectedRoute>} />
       <Route path="/kpi" element={<ProtectedRoute><KPI /></ProtectedRoute>} />
       <Route path="/calendar" element={<ProtectedRoute><CalendarView /></ProtectedRoute>} />

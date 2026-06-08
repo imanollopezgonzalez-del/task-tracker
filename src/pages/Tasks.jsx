@@ -8,10 +8,11 @@ import TaskModal from '../components/tasks/TaskModal'
 import EmptyState from '../components/ui/EmptyState'
 import { useUsers } from '../hooks/useUsers'
 import { PRIORITIES } from '../utils/constants'
-import { CheckSquare, Plus, RefreshCw } from 'lucide-react'
+import { CheckSquare, Plus, RefreshCw, ChevronDown } from 'lucide-react'
 import { isToday, isThisWeek, isThisMonth, isThisYear, isBefore, startOfDay } from 'date-fns'
 import { updateTask, completeAndRecur } from '../services/tasks'
 import toast from 'react-hot-toast'
+import Avatar from '../components/ui/Avatar'
 
 const TABS = [
   { key: 'all', label: 'Todas' },
@@ -30,9 +31,9 @@ function filterByTab(tasks, tab) {
       const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
       return isToday(d) || isBefore(d, startOfDay(new Date()))
     })
-    case 'weekly': return tasks.filter((t) => t.recurrence === 'weekly' || (t.dueDate && isThisWeek(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate), { weekStartsOn: 1 })))
-    case 'monthly': return tasks.filter((t) => t.recurrence === 'monthly' || (t.dueDate && isThisMonth(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate))))
-    case 'annual': return tasks.filter((t) => t.recurrence === 'annual' || (t.dueDate && isThisYear(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate))))
+    case 'weekly': return tasks.filter((t) => t.status !== 'done' && (t.recurrence === 'weekly' || (t.dueDate && isThisWeek(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate), { weekStartsOn: 1 }))))
+    case 'monthly': return tasks.filter((t) => t.status !== 'done' && (t.recurrence === 'monthly' || (t.dueDate && isThisMonth(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)))))
+    case 'annual': return tasks.filter((t) => t.status !== 'done' && (t.recurrence === 'annual' || (t.dueDate && isThisYear(t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)))))
     case 'done': return tasks.filter((t) => t.status === 'done')
     default: return tasks.filter((t) => t.status !== 'done')
   }
@@ -42,7 +43,7 @@ function applyFilters(tasks, filters) {
   let result = [...tasks]
   if (filters.search) {
     const q = filters.search.toLowerCase()
-    result = result.filter((t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q) || t.tags?.some((tag) => tag.toLowerCase().includes(q)))
+    result = result.filter((t) => t.title.toLowerCase().includes(q) || t.description?.toLowerCase().includes(q))
   }
   if (filters.priority) result = result.filter((t) => t.priority === filters.priority)
   if (filters.status) result = result.filter((t) => t.status === filters.status)
@@ -62,16 +63,25 @@ function applyFilters(tasks, filters) {
   return result
 }
 
-export default function Tasks({ showAll = false }) {
+export default function Tasks() {
   const { myTasks, allTasks } = useTasks()
-  const { currentUser } = useAuth()
+  const { currentUser, userProfile } = useAuth()
   const { users } = useUsers()
+  const isAdmin = userProfile?.role === 'admin'
+
   const [tab, setTab] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
   const [filters, setFilters] = useState({ search: '', priority: '', status: '', sort: 'priority' })
+  const [selectedEmployee, setSelectedEmployee] = useState('all') // admin filter
 
-  const source = showAll ? allTasks : myTasks
+  // Admin ve todas las tareas filtradas por empleado; empleado ve solo las suyas
+  const source = useMemo(() => {
+    if (!isAdmin) return myTasks
+    if (selectedEmployee === 'all') return allTasks
+    return allTasks.filter((t) => t.assignedTo === selectedEmployee || t.verifiedBy === selectedEmployee)
+  }, [isAdmin, allTasks, myTasks, selectedEmployee])
+
   const tabFiltered = useMemo(() => filterByTab(source, tab), [source, tab])
   const tasks = useMemo(() => applyFilters(tabFiltered, filters), [tabFiltered, filters])
 
@@ -90,12 +100,37 @@ export default function Tasks({ showAll = false }) {
     } catch { toast.error('Error al completar la tarea') }
   }
 
+  const selectedUser = users.find((u) => u.uid === selectedEmployee)
+
   return (
     <div>
-      <Header title={showAll ? 'Todas las tareas' : 'Mis tareas'} action={{ label: 'Nueva tarea', onClick: () => setShowModal(true) }} />
+      <Header
+        title={isAdmin ? 'Tareas del equipo' : 'Mis tareas'}
+        action={{ label: 'Nueva tarea', onClick: () => setShowModal(true) }}
+      />
       <div className="px-4 lg:px-6 py-5 space-y-4 max-w-4xl">
+
+        {/* Admin: filtro por empleado */}
+        {isAdmin && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-brand-text-muted font-medium">Ver tareas de:</span>
+            <button onClick={() => setSelectedEmployee('all')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedEmployee === 'all' ? 'bg-brand-dark text-white' : 'bg-brand-bg-2 text-brand-text-muted hover:bg-brand-bg-3'}`}>
+              Todo el equipo
+            </button>
+            {users.map((u) => (
+              <button key={u.uid} onClick={() => setSelectedEmployee(u.uid)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${selectedEmployee === u.uid ? 'bg-brand-dark text-white' : 'bg-brand-bg-2 text-brand-text-muted hover:bg-brand-bg-3'}`}>
+                <Avatar name={u.displayName} size="xs" />
+                {u.displayName?.split(' ')[0] || u.email}
+                {u.uid === currentUser?.uid && <span className="opacity-60">(yo)</span>}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Tabs */}
-        <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex gap-1 overflow-x-auto pb-1">
           {TABS.map(({ key, label }) => {
             const count = filterByTab(source, key).length
             return (
@@ -108,25 +143,28 @@ export default function Tasks({ showAll = false }) {
           })}
         </div>
 
-        {/* Filters */}
         <TaskFilters filters={filters} onChange={setFilters} />
 
-        {/* Task list */}
         {tasks.length === 0 ? (
           <EmptyState
             icon={tab === 'done' ? CheckSquare : RefreshCw}
-            title={filters.search || filters.priority || filters.status ? 'Sin resultados para esos filtros' : 'Sin tareas en esta vista'}
-            description={tab === 'done' ? 'Las tareas completadas aparecerán aquí.' : 'Crea una nueva tarea para empezar.'}
-            action={!filters.search && !filters.priority && !filters.status ? (
-              <button onClick={() => setShowModal(true)} className="btn-primary text-sm">
-                <Plus size={15} /> Nueva tarea
-              </button>
+            title={filters.search || filters.priority || filters.status ? 'Sin resultados' : 'Sin tareas en esta vista'}
+            description={tab === 'done' ? 'Las completadas aparecerán aquí.' : 'Crea una nueva tarea para empezar.'}
+            action={!filters.search && !filters.priority && !filters.status && isAdmin ? (
+              <button onClick={() => setShowModal(true)} className="btn-primary text-sm"><Plus size={15} /> Nueva tarea</button>
             ) : null}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {tasks.map((task) => (
-              <TaskCard key={task.id} task={task} users={users} onEdit={handleEdit} onComplete={handleComplete} />
+              <div key={task.id}>
+                {task.isVerifierTask && !isAdmin && (
+                  <div className="flex items-center gap-1 mb-1 px-1">
+                    <span className="text-xs text-amber-600 font-semibold">👁 Para supervisar</span>
+                  </div>
+                )}
+                <TaskCard task={task} users={users} onEdit={isAdmin || task.assignedTo === currentUser?.uid ? handleEdit : null} onComplete={handleComplete} />
+              </div>
             ))}
           </div>
         )}

@@ -53,14 +53,18 @@ export const subscribeTasks = (companyId, callback) => {
 }
 
 export const subscribeMyTasks = (userId, companyId, callback) => {
-  const q = query(
-    collection(db, TASKS_COL),
-    where('companyId', '==', companyId),
-    where('assignedTo', '==', userId)
-  )
-  return onSnapshot(q, (snap) => {
-    callback(sortByCreated(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
-  }, (err) => console.error('subscribeMyTasks error:', err))
+  let assigned = []
+  let verifier = []
+  const merge = () => {
+    const map = new Map()
+    ;[...assigned, ...verifier].forEach((t) => map.set(t.id, t))
+    callback(sortByCreated([...map.values()]))
+  }
+  const q1 = query(collection(db, TASKS_COL), where('companyId', '==', companyId), where('assignedTo', '==', userId))
+  const q2 = query(collection(db, TASKS_COL), where('companyId', '==', companyId), where('verifiedBy', '==', userId))
+  const u1 = onSnapshot(q1, (snap) => { assigned = snap.docs.map((d) => ({ id: d.id, ...d.data() })); merge() }, console.error)
+  const u2 = onSnapshot(q2, (snap) => { verifier = snap.docs.map((d) => ({ id: d.id, ...d.data(), isVerifierTask: true })); merge() }, console.error)
+  return () => { u1(); u2() }
 }
 
 export const addComment = async (taskId, text, user) => {

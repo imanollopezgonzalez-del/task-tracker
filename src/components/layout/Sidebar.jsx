@@ -1,23 +1,30 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, LogOut, CheckSquare2, Calendar, Menu, X } from 'lucide-react'
+import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from 'react'
 import Avatar from '../ui/Avatar'
 import toast from 'react-hot-toast'
 
-const NAV_ITEMS = [
+const EMPLOYEE_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Inicio', end: true },
   { to: '/tasks', icon: CheckSquare, label: 'Mis Tareas' },
-  { to: '/all-tasks', icon: CheckSquare2, label: 'Todas las Tareas' },
+  { to: '/calendar', icon: Calendar, label: 'Calendario' },
+]
+
+const ADMIN_NAV = [
+  { to: '/', icon: LayoutDashboard, label: 'Inicio', end: true },
+  { to: '/tasks', icon: CheckSquare, label: 'Tareas del equipo' },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
   { to: '/kpi', icon: BarChart3, label: 'KPIs & Métricas' },
-  { to: '/admin', icon: Users, label: 'Equipo', adminOnly: true },
+  { to: '/admin', icon: Users, label: 'Equipo' },
   { to: '/settings', icon: Settings, label: 'Ajustes' },
 ]
 
 function SidebarContent({ onClose }) {
   const { userProfile, logout } = useAuth()
   const navigate = useNavigate()
+  const isAdmin = userProfile?.role === 'admin'
+  const navItems = isAdmin ? ADMIN_NAV : EMPLOYEE_NAV
 
   const handleLogout = async () => {
     await logout()
@@ -45,9 +52,8 @@ function SidebarContent({ onClose }) {
       </div>
 
       <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
-        {NAV_ITEMS.filter((item) => !item.adminOnly || userProfile?.role === 'admin').map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.end}
-            onClick={onClose}
+        {navItems.map((item) => (
+          <NavLink key={item.to} to={item.to} end={item.end} onClick={onClose}
             className={({ isActive }) => `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`}>
             <item.icon size={18} />
             <span>{item.label}</span>
@@ -60,11 +66,10 @@ function SidebarContent({ onClose }) {
           <Avatar name={userProfile?.displayName} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="text-white text-xs font-medium truncate">{userProfile?.displayName}</p>
-            <p className="text-white/50 text-xs truncate">{userProfile?.role === 'admin' ? 'Administrador' : 'Empleado'}</p>
+            <p className="text-white/50 text-xs">{isAdmin ? 'Administrador' : 'Empleado'}</p>
           </div>
         </div>
-        <button onClick={handleLogout}
-          className="sidebar-item sidebar-item-inactive w-full">
+        <button onClick={handleLogout} className="sidebar-item sidebar-item-inactive w-full">
           <LogOut size={16} />
           <span>Cerrar sesión</span>
         </button>
@@ -78,7 +83,6 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-brand-dark px-4 py-3 flex items-center gap-3 shadow-lg">
         <button onClick={() => setMobileOpen(true)} className="text-white/80 hover:text-white">
           <Menu size={22} />
@@ -91,7 +95,6 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="lg:hidden fixed inset-0 z-40 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
@@ -101,7 +104,6 @@ export default function Sidebar() {
         </div>
       )}
 
-      {/* Desktop sidebar */}
       <div className="hidden lg:flex w-56 flex-shrink-0 h-screen sticky top-0">
         <div className="w-full">
           <SidebarContent />
