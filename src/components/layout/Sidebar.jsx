@@ -36,8 +36,8 @@ function SidebarContent({ onClose }) {
     <div className="flex flex-col h-full bg-brand-dark">
       <div className="px-4 pt-5 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-brand-orange rounded-lg flex items-center justify-center flex-shrink-0">
-            <CheckSquare size={16} className="text-white" />
+          <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg viewBox="0 0 20 20" fill="none" className="w-5 h-5"><path d="M4 10.5l4.5 4.5 7.5-8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
           <div className="min-w-0">
             <p className="text-white text-xs font-bold leading-none">Gestión</p>
@@ -88,8 +88,8 @@ export default function Sidebar() {
           <Menu size={22} />
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-brand-orange rounded-md flex items-center justify-center">
-            <CheckSquare size={14} className="text-white" />
+          <div className="w-7 h-7 bg-emerald-500 rounded-md flex items-center justify-center">
+            <svg viewBox="0 0 20 20" fill="none" className="w-4 h-4"><path d="M4 10.5l4.5 4.5 7.5-8" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
           <span className="text-white text-sm font-semibold">Gestión de Tareas</span>
         </div>

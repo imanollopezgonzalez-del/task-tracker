@@ -66,8 +66,8 @@ export default function Login() {
     <div className="min-h-screen bg-brand-bg flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-brand-orange rounded-2xl mb-4 shadow-lg shadow-brand-orange/20">
-            <CheckSquare size={28} className="text-white" />
+          <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500 rounded-2xl mb-4 shadow-lg shadow-emerald-500/30">
+            <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8"><path d="M4 13l5.5 5.5L20 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </div>
           <h1 className="text-2xl font-bold text-brand-text">Gestión de Tareas</h1>
           <p className="text-sm text-brand-text-muted mt-1">Pollo Cocido & Pastas Pariggi</p>
