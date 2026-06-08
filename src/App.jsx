@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { TaskProvider } from './contexts/TaskContext'
@@ -51,6 +52,14 @@ export default function App() {
     <HashRouter>
       <AuthProvider>
         <AppRoutes />
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            style: { background: '#1C1917', color: '#FAF8F5', borderRadius: '12px', fontSize: '13px' },
+            success: { iconTheme: { primary: '#D97757', secondary: '#FAF8F5' } },
+            duration: 4000,
+          }}
+        />
       </AuthProvider>
     </HashRouter>
   )
