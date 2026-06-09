@@ -6,12 +6,40 @@ import { formatRelative, isOverdue, isDueSoon } from '../../utils/dates'
 import { RECURRENCES } from '../../utils/constants'
 import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 
+const tsToDate = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
+
+function getRecurrencePattern(task) {
+  const cfg = task.recurrenceConfig || {}
+  switch (task.recurrence) {
+    case 'weekly':
+      return (cfg.days?.length ? cfg.days : [1,2,3,4,5])
+        .map((d) => ['D','L','M','X','J','V','S'][d]).join(' ')
+    case 'monthly': {
+      const dom = cfg.dayOfMonth
+        || tsToDate(task.dueDate)?.getDate()
+        || tsToDate(task.startDate)?.getDate()
+      return dom ? `Día ${dom}` : 'Mensual'
+    }
+    case 'daily':
+      return (cfg.every || 1) > 1 ? `c/${cfg.every}d` : 'Diaria'
+    case 'annual':
+      return 'Anual'
+    default:
+      return ''
+  }
+}
+
 export default function TaskCard({ task, users = [], onEdit, onComplete, compact = false }) {
   const assignee = users.find((u) => u.uid === task.assignedTo)
   const verifier = users.find((u) => u.uid === task.verifiedBy)
-  const overdue = isOverdue(task.dueDate, task.status)
-  const dueSoon = isDueSoon(task.dueDate, task.status)
   const isDone = task.status === 'done'
+
+  const isRecurring = task.type === 'recurring' && !!task.recurrence
+  // Para recurrentes, usar startDate como fallback si no hay dueDate
+  const effectiveDate = task.dueDate || (isRecurring ? task.startDate : null)
+  const overdue = isOverdue(effectiveDate, task.status)
+  const dueSoon = isDueSoon(effectiveDate, task.status)
+  const patternLabel = isRecurring ? getRecurrencePattern(task) : ''
 
   return (
     <div className={`card hover:shadow-card-hover transition-all duration-200 group ${overdue ? 'border-red-200' : ''} ${isDone ? 'opacity-70' : ''}`}>
@@ -20,14 +48,13 @@ export default function TaskCard({ task, users = [], onEdit, onComplete, compact
           <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
             <PriorityBadge priority={task.priority} />
             <StatusBadge status={task.status} />
-            {task.type === 'recurring' && task.recurrence && (
+            {isRecurring && (
               <span className="badge bg-brand-bg-2 text-brand-text-muted border border-brand-border text-xs">
                 <RefreshCw size={10} />
                 {RECURRENCES[task.recurrence]?.shortLabel}
               </span>
             )}
           </div>
-          {/* Botón completar */}
           {!isDone && onComplete && (
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onComplete(task) }}
@@ -63,39 +90,25 @@ export default function TaskCard({ task, users = [], onEdit, onComplete, compact
               </div>
             )}
           </div>
+
           <div className="flex items-center gap-2">
-            {task.type === 'recurring' && task.recurrence ? (() => {
-              const cfg = task.recurrenceConfig || {}
-              const ts = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
-              let patternLabel = ''
-              if (task.recurrence === 'weekly') {
-                patternLabel = (cfg.days?.length ? cfg.days : [1,2,3,4,5]).map((d) => ['D','L','M','X','J','V','S'][d]).join(' ')
-              } else if (task.recurrence === 'monthly') {
-                const dom = cfg.dayOfMonth || ts(task.dueDate)?.getDate() || ts(task.startDate)?.getDate()
-                patternLabel = dom ? `Día ${dom}` : 'Mensual'
-              } else if (task.recurrence === 'daily') {
-                patternLabel = (cfg.every || 1) > 1 ? `c/${cfg.every}d` : 'Diaria'
-              } else if (task.recurrence === 'annual') {
-                patternLabel = 'Anual'
-              }
-              return (
-                <>
-                  <div className="flex items-center gap-1 text-xs text-brand-text-muted">
-                    <RefreshCw size={11} />
-                    <span>{patternLabel}</span>
+            {isRecurring ? (
+              <>
+                <div className="flex items-center gap-1 text-xs text-brand-text-muted">
+                  <RefreshCw size={11} />
+                  <span>{patternLabel}</span>
+                </div>
+                {effectiveDate && (
+                  <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-semibold' : dueSoon ? 'text-amber-500' : 'text-brand-text-muted'}`}>
+                    {overdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
+                    <span>{formatRelative(effectiveDate)}</span>
                   </div>
-                  {task.dueDate && (
-                    <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-semibold' : dueSoon ? 'text-amber-500' : 'text-brand-text-muted'}`}>
-                      {overdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
-                      <span>{formatRelative(task.dueDate)}</span>
-                    </div>
-                  )}
-                </>
-              )
-            })() : task.dueDate ? (
+                )}
+              </>
+            ) : effectiveDate ? (
               <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-semibold' : dueSoon ? 'text-amber-500' : 'text-brand-text-muted'}`}>
                 {overdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
-                <span>{formatRelative(task.dueDate)}</span>
+                <span>{formatRelative(effectiveDate)}</span>
               </div>
             ) : null}
           </div>
