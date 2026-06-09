@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isToday, isSameMonth, isSameDay, addMonths, subMonths,
+  isBefore, startOfDay, differenceInCalendarDays,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, Plus, RefreshCw, X } from 'lucide-react'
@@ -19,10 +20,17 @@ const PRIORITY_DOT = { urgent: 'bg-red-500', important: 'bg-brand-orange', low: 
 export default function CalendarView() {
   const { allTasks } = useTasks()
   const { users } = useUsers()
-  const { currentUser } = useAuth()
+  const { currentUser, userProfile } = useAuth()
+  const isAdmin = userProfile?.role === 'admin'
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
   const [showModal, setShowModal] = useState(false)
+
+  // Admins ven todo el equipo; colaboradores solo sus propias tareas
+  const relevantTasks = useMemo(() => {
+    if (isAdmin) return allTasks
+    return allTasks.filter((t) => t.assignedTo === currentUser?.uid || t.verifiedBy === currentUser?.uid)
+  }, [allTasks, isAdmin, currentUser])
 
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
@@ -30,18 +38,45 @@ export default function CalendarView() {
   const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
   const days = eachDayOfInterval({ start: calStart, end: calEnd })
 
-  // Obtener tareas para un día dado (incluyendo recurrentes)
+  const toDate = (ts) => ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null
+
+  // Obtener tareas para un día dado expandiendo el patrón de recurrencia
   const getTasksForDay = (day) => {
-    return allTasks.filter((t) => {
+    return relevantTasks.filter((t) => {
       if (t.status === 'done') return false
-      if (!t.dueDate) {
-        // Recurrentes sin fecha fija
-        if (t.recurrence === 'daily') return true
-        if (t.recurrence === 'weekly') return day.getDay() === (t.weekDay ?? 1)
+
+      if (t.type === 'recurring' && t.recurrence) {
+        const cfg = t.recurrenceConfig || {}
+        // Para el corte de inicio usamos startDate; dueDate es la próxima ocurrencia, no el inicio
+        const startBase = toDate(t.startDate) || toDate(t.dueDate)
+
+        // No mostrar días anteriores al inicio real de la tarea
+        if (startBase && isBefore(startOfDay(day), startOfDay(startBase))) return false
+
+        if (t.recurrence === 'daily') {
+          if (!startBase) return true
+          const every = cfg.every || 1
+          const diff = differenceInCalendarDays(day, startBase)
+          return diff >= 0 && diff % every === 0
+        }
+        if (t.recurrence === 'weekly') {
+          const days = cfg.days?.length ? cfg.days : [1]
+          return days.includes(day.getDay())
+        }
+        if (t.recurrence === 'monthly') {
+          const dom = cfg.dayOfMonth || startBase?.getDate()
+          return dom ? day.getDate() === dom : false
+        }
+        if (t.recurrence === 'annual') {
+          if (!startBase) return false
+          return day.getDate() === startBase.getDate() && day.getMonth() === startBase.getMonth()
+        }
         return false
       }
-      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
-      return isSameDay(d, day)
+
+      // Tarea única
+      const d = toDate(t.dueDate) || toDate(t.startDate)
+      return d ? isSameDay(d, day) : false
     })
   }
 
@@ -49,7 +84,7 @@ export default function CalendarView() {
 
   // Resumen de recurrentes
   const recurringTasks = useMemo(() =>
-    allTasks.filter((t) => t.type === 'recurring' && t.status !== 'done')
+    relevantTasks.filter((t) => t.type === 'recurring' && t.status !== 'done')
       .sort((a, b) => (PRIORITIES[a.priority]?.order || 9) - (PRIORITIES[b.priority]?.order || 9))
   , [allTasks])
 

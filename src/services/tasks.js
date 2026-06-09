@@ -8,6 +8,9 @@ import { addDays, addWeeks, addMonths, addYears } from 'date-fns'
 const TASKS_COL = 'tasks'
 const COMMENTS_SUB = 'comments'
 
+// Parsea "YYYY-MM-DD" como medianoche local (evita que new Date("YYYY-MM-DD") use UTC)
+const parseLocalDate = (str) => new Date(str + 'T00:00:00')
+
 const sortByCreated = (tasks) =>
   [...tasks].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
 
@@ -20,16 +23,16 @@ export const createTask = async (data, userId) => {
     status: data.status || 'not_started',
     completedAt: null,
   }
-  if (data.dueDate) taskData.dueDate = Timestamp.fromDate(new Date(data.dueDate))
-  if (data.startDate) taskData.startDate = Timestamp.fromDate(new Date(data.startDate))
+  if (data.dueDate) taskData.dueDate = Timestamp.fromDate(parseLocalDate(data.dueDate))
+  if (data.startDate) taskData.startDate = Timestamp.fromDate(parseLocalDate(data.startDate))
   const ref = await addDoc(collection(db, TASKS_COL), taskData)
   return ref.id
 }
 
 export const updateTask = async (taskId, data) => {
   const updates = { ...data, updatedAt: serverTimestamp() }
-  if (data.dueDate && !(data.dueDate?.toDate)) updates.dueDate = Timestamp.fromDate(new Date(data.dueDate))
-  if (data.startDate && !(data.startDate?.toDate)) updates.startDate = Timestamp.fromDate(new Date(data.startDate))
+  if (data.dueDate && !(data.dueDate?.toDate)) updates.dueDate = Timestamp.fromDate(parseLocalDate(data.dueDate))
+  if (data.startDate && !(data.startDate?.toDate)) updates.startDate = Timestamp.fromDate(parseLocalDate(data.startDate))
   if (data.status === 'done' && !data.completedAt) updates.completedAt = serverTimestamp()
   if (data.status && data.status !== 'done') updates.completedAt = null
   await updateDoc(doc(db, TASKS_COL, taskId), updates)

@@ -31,21 +31,54 @@ function filterByView(tasks, view) {
   if (view === 'done') return tasks.filter((t) => t.status === 'done')
   return tasks.filter((t) => {
     if (t.status === 'done') return false
-    if (view === 'today') {
-      if (!t.dueDate) return t.recurrence === 'daily'
-      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
-      return isToday(d) || isBefore(d, startOfDay(new Date()))
+
+    const toDate = (ts) => ts?.toDate ? ts.toDate() : ts ? new Date(ts) : null
+    const due = toDate(t.dueDate)
+    const start = toDate(t.startDate)
+    const now = new Date()
+
+    // Recurrentes: visibilidad por patrón, no por dueDate exacto
+    if (t.type === 'recurring' && t.recurrence) {
+      const startRef = start || due
+      // No mostrar si la tarea aún no empezó
+      if (startRef && isBefore(startOfDay(now), startRef)) return false
+
+      const cfg = t.recurrenceConfig || {}
+      if (view === 'today') {
+        if (t.recurrence === 'daily') return true
+        if (t.recurrence === 'weekly') {
+          const days = cfg.days?.length ? cfg.days : [1]
+          return days.includes(now.getDay())
+        }
+        if (t.recurrence === 'monthly') {
+          const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
+          return dom ? now.getDate() === dom : false
+        }
+        if (t.recurrence === 'annual') {
+          const base = due || start
+          return base ? now.getDate() === base.getDate() && now.getMonth() === base.getMonth() : false
+        }
+        return false
+      }
+      if (view === 'week') return t.recurrence === 'daily' || t.recurrence === 'weekly'
+      if (view === 'month') {
+        if (t.recurrence === 'annual') {
+          const base = due || start
+          return base ? base.getMonth() === now.getMonth() : false
+        }
+        return true
+      }
+      return false
     }
-    if (view === 'week') {
-      if (!t.dueDate) return t.recurrence === 'weekly'
-      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
-      return isThisWeek(d, { weekStartsOn: 1 })
-    }
-    if (view === 'month') {
-      if (!t.dueDate) return t.recurrence === 'monthly'
-      const d = t.dueDate?.toDate ? t.dueDate.toDate() : new Date(t.dueDate)
-      return isThisMonth(d)
-    }
+
+    // Tarea única: dueDate con startDate como respaldo
+    const ref = due ?? start
+    if (!ref) return true  // sin fechas: siempre visible
+
+    const past = isBefore(ref, startOfDay(now))
+    if (view === 'today') return isToday(ref) || past
+    if (view === 'week') return isThisWeek(ref, { weekStartsOn: 1 }) || past
+    if (view === 'month') return isThisMonth(ref) || past
     return false
   })
 }
