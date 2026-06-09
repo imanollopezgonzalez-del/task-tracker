@@ -64,12 +64,35 @@ export default function TaskCard({ task, users = [], onEdit, onComplete, compact
             )}
           </div>
           <div className="flex items-center gap-2">
-            {task.type === 'recurring' && task.recurrence === 'weekly' ? (
-              <div className="flex items-center gap-1 text-xs text-brand-text-muted">
-                <RefreshCw size={11} />
-                <span>{(task.recurrenceConfig?.days?.length ? task.recurrenceConfig.days : [1,2,3,4,5]).map((d) => ['D','L','M','X','J','V','S'][d]).join(' ')}</span>
-              </div>
-            ) : task.dueDate ? (
+            {task.type === 'recurring' && task.recurrence ? (() => {
+              const cfg = task.recurrenceConfig || {}
+              const ts = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
+              let patternLabel = ''
+              if (task.recurrence === 'weekly') {
+                patternLabel = (cfg.days?.length ? cfg.days : [1,2,3,4,5]).map((d) => ['D','L','M','X','J','V','S'][d]).join(' ')
+              } else if (task.recurrence === 'monthly') {
+                const dom = cfg.dayOfMonth || ts(task.dueDate)?.getDate() || ts(task.startDate)?.getDate()
+                patternLabel = dom ? `Día ${dom}` : 'Mensual'
+              } else if (task.recurrence === 'daily') {
+                patternLabel = (cfg.every || 1) > 1 ? `c/${cfg.every}d` : 'Diaria'
+              } else if (task.recurrence === 'annual') {
+                patternLabel = 'Anual'
+              }
+              return (
+                <>
+                  <div className="flex items-center gap-1 text-xs text-brand-text-muted">
+                    <RefreshCw size={11} />
+                    <span>{patternLabel}</span>
+                  </div>
+                  {task.dueDate && (
+                    <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-semibold' : dueSoon ? 'text-amber-500' : 'text-brand-text-muted'}`}>
+                      {overdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
+                      <span>{formatRelative(task.dueDate)}</span>
+                    </div>
+                  )}
+                </>
+              )
+            })() : task.dueDate ? (
               <div className={`flex items-center gap-1 text-xs ${overdue ? 'text-red-500 font-semibold' : dueSoon ? 'text-amber-500' : 'text-brand-text-muted'}`}>
                 {overdue ? <AlertCircle size={12} /> : <Calendar size={12} />}
                 <span>{formatRelative(task.dueDate)}</span>
