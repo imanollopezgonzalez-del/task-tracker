@@ -11,9 +11,16 @@ import toast from 'react-hot-toast'
 import Spinner from '../ui/Spinner'
 import { ChevronDown } from 'lucide-react'
 
+const RECURRENCE_DEFAULTS = {
+  daily: { every: 1 },
+  weekly: { days: [1, 2, 3, 4, 5] },
+  monthly: { dayOfMonth: new Date().getDate() },
+  annual: {},
+}
+
 const EMPTY = {
   title: '', description: '', priority: 'important', status: 'not_started',
-  type: 'single', recurrence: 'weekly', recurrenceConfig: {},
+  type: 'single', recurrence: 'weekly', recurrenceConfig: { days: [1, 2, 3, 4, 5] },
   assignedTo: '', verifiedBy: '', dueDate: '', startDate: '', observation: '',
 }
 
@@ -150,7 +157,10 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
           <label className="label">Tipo de tarea</label>
           <div className="flex gap-1 bg-brand-bg-2 p-1 rounded-lg mb-3">
             {[['single', 'Tarea única'], ['recurring', 'Tarea recurrente']].map(([v, l]) => (
-              <button key={v} type="button" onClick={() => set('type', v)}
+              <button key={v} type="button" onClick={() => setForm((f) => ({
+                ...f, type: v,
+                recurrenceConfig: v === 'recurring' ? (Object.keys(f.recurrenceConfig || {}).length ? f.recurrenceConfig : (RECURRENCE_DEFAULTS[f.recurrence] || {})) : f.recurrenceConfig,
+              }))}
                 className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${form.type === v ? 'bg-white shadow-card text-brand-text' : 'text-brand-text-muted'}`}>
                 {l}
               </button>
@@ -160,7 +170,7 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
             <RecurrencePicker
               recurrence={form.recurrence}
               config={form.recurrenceConfig}
-              onChange={(v) => set('recurrence', v)}
+              onChange={(v) => setForm((f) => ({ ...f, recurrence: v, recurrenceConfig: RECURRENCE_DEFAULTS[v] || {} }))}
               onConfigChange={(v) => set('recurrenceConfig', v)}
             />
           )}

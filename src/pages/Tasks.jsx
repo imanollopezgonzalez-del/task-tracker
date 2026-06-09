@@ -5,7 +5,7 @@ import Header from '../components/layout/Header'
 import TaskCard from '../components/tasks/TaskCard'
 import TaskModal from '../components/tasks/TaskModal'
 import { PRIORITIES } from '../utils/constants'
-import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay } from 'date-fns'
+import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay, startOfWeek, endOfWeek } from 'date-fns'
 import { CheckSquare, Clock, AlertCircle, TrendingUp, RefreshCw, Eye, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
 import Avatar from '../components/ui/Avatar'
 import { useUsers } from '../hooks/useUsers'
@@ -60,7 +60,26 @@ function filterByView(tasks, view) {
         }
         return false
       }
-      if (view === 'week') return t.recurrence === 'daily' || t.recurrence === 'weekly'
+      if (view === 'week') {
+        if (t.recurrence === 'daily' || t.recurrence === 'weekly') return true
+        if (t.recurrence === 'monthly') {
+          const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
+          if (!dom) return false
+          const wStart = startOfWeek(now, { weekStartsOn: 1 })
+          const wEnd = endOfWeek(now, { weekStartsOn: 1 })
+          const sched = new Date(now.getFullYear(), now.getMonth(), dom)
+          return sched >= wStart && sched <= wEnd
+        }
+        if (t.recurrence === 'annual') {
+          const base = due || start
+          if (!base) return false
+          const wStart = startOfWeek(now, { weekStartsOn: 1 })
+          const wEnd = endOfWeek(now, { weekStartsOn: 1 })
+          const sched = new Date(now.getFullYear(), base.getMonth(), base.getDate())
+          return sched >= wStart && sched <= wEnd
+        }
+        return false
+      }
       if (view === 'month') {
         if (t.recurrence === 'annual') {
           const base = due || start
