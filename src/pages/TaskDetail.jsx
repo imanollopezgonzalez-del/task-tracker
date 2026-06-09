@@ -39,20 +39,17 @@ export default function TaskDetail() {
   const assignee = users.find((u) => u.uid === task?.assignedTo)
   const verifier = users.find((u) => u.uid === task?.verifiedBy)
   const overdue = task && isOverdue(task.dueDate, task.status)
-  const canEdit = userProfile?.role === 'admin' || task?.assignedTo === currentUser?.uid || task?.createdBy === currentUser?.uid
-  const canVerify = task?.verifiedBy === currentUser?.uid && task?.status !== 'done'
+  const isAdmin = userProfile?.role === 'admin'
+  const isVerifier = task?.verifiedBy === currentUser?.uid
+  const hasVerifier = !!task?.verifiedBy
+  const canEdit = isAdmin || task?.assignedTo === currentUser?.uid || task?.createdBy === currentUser?.uid
 
   const handleStatusChange = async (newStatus) => {
     if (!task) return
     try {
-      if (newStatus === 'done' && task.type === 'recurring') {
-        await completeAndRecur(task, currentUser.uid)
-        toast.success('Tarea completada. Se ha creado la siguiente recurrencia.')
-      } else {
-        await updateTask(task.id, { status: newStatus })
-        toast.success('Estado actualizado')
-      }
-      if (newStatus === 'done' && task.verifiedBy) {
+      // Si hay verificador y no es el verificador ni admin, no puede ir directo a done
+      if (newStatus === 'done' && hasVerifier && !isVerifier && !isAdmin) {
+        await updateTask(task.id, { status: 'pending_response' })
         await createNotification({
           recipientId: task.verifiedBy,
           taskId: task.id,
@@ -60,9 +57,33 @@ export default function TaskDetail() {
           type: 'completed',
           senderName: userProfile?.displayName,
         })
+        setTask((t) => ({ ...t, status: 'pending_response' }))
+        toast.success('Enviado a verificación')
+        return
+      }
+      if (newStatus === 'done' && task.type === 'recurring') {
+        await completeAndRecur(task, currentUser.uid)
+        toast.success('Tarea completada. Se ha creado la siguiente recurrencia.')
+      } else {
+        await updateTask(task.id, { status: newStatus })
+        toast.success('Estado actualizado')
       }
       setTask((t) => ({ ...t, status: newStatus }))
     } catch { toast.error('Error al cambiar el estado') }
+  }
+
+  const handleVerifyTask = async () => {
+    if (!task) return
+    try {
+      if (task.type === 'recurring' && task.recurrence) {
+        await completeAndRecur(task, currentUser.uid)
+        toast.success('Verificada y cerrada. Próxima ocurrencia creada.')
+      } else {
+        await updateTask(task.id, { status: 'done' })
+        toast.success('Verificada y cerrada')
+      }
+      setTask((t) => ({ ...t, status: 'done' }))
+    } catch { toast.error('Error al verificar') }
   }
 
   const handleDelete = async () => {
@@ -195,27 +216,30 @@ export default function TaskDetail() {
           <div className="card p-4">
             <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-3">Cambiar estado</p>
             <div className="flex flex-wrap gap-2">
-              {Object.entries(STATUSES).filter(([k]) => k !== task.status).map(([k, v]) => (
-                <button key={k} onClick={() => handleStatusChange(k)}
-                  className={`badge ${v.bg} ${v.color} border cursor-pointer hover:opacity-80 transition-opacity py-1.5 px-3`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${v.dot}`} />
-                  {v.label}
-                </button>
-              ))}
+              {Object.entries(STATUSES)
+                .filter(([k]) => k !== task.status)
+                .filter(([k]) => !(k === 'done' && hasVerifier && !isVerifier && !isAdmin))
+                .map(([k, v]) => (
+                  <button key={k} onClick={() => handleStatusChange(k)}
+                    className={`badge ${v.bg} ${v.color} border cursor-pointer hover:opacity-80 transition-opacity py-1.5 px-3`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${v.dot}`} />
+                    {v.label}
+                  </button>
+                ))}
             </div>
           </div>
         )}
 
-        {/* Verify */}
-        {canVerify && task.status === 'done' && (
+        {/* Panel verificación — visible solo para el verificador cuando el asignado marcó done */}
+        {isVerifier && task.status === 'pending_response' && (
           <div className="card p-4 border-green-200 bg-green-50">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-green-800">Esta tarea está lista para verificar</p>
-                <p className="text-xs text-green-600 mt-0.5">Confirma que la tarea ha sido completada correctamente</p>
+                <p className="text-sm font-semibold text-green-800">Tarea lista para verificar</p>
+                <p className="text-xs text-green-600 mt-0.5">Confirma que la tarea fue completada correctamente</p>
               </div>
-              <button onClick={() => handleStatusChange('done')} className="btn-primary bg-green-600 hover:bg-green-700 text-sm">
-                <CheckCircle size={15} /> Verificar
+              <button onClick={handleVerifyTask} className="btn-primary bg-green-600 hover:bg-green-700 text-sm">
+                <CheckCircle size={15} /> Verificar y cerrar
               </button>
             </div>
           </div>
