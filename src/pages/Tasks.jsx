@@ -240,13 +240,14 @@ export default function Tasks() {
 
   const handleComplete = async (task) => {
     try {
-      if (task.type === 'recurring' && task.recurrence) {
-        await completeAndRecur(task, currentUser.uid)
-        toast.success('✓ Completada. Próxima recurrencia creada.')
-      } else if (task.verifiedBy && task.verifiedBy !== currentUser.uid) {
+      // Verificación va primero, incluso en recurrentes
+      if (task.verifiedBy && task.verifiedBy !== currentUser.uid) {
         await updateTask(task.id, { status: 'pending_response' })
         await createNotification({ recipientId: task.verifiedBy, taskId: task.id, taskTitle: task.title, type: 'completed', senderName: userProfile?.displayName })
         toast.success('✓ Enviada a verificación')
+      } else if (task.type === 'recurring' && task.recurrence) {
+        await completeAndRecur(task, currentUser.uid)
+        toast.success('✓ Completada. Próxima ocurrencia creada.')
       } else {
         await updateTask(task.id, { status: 'done' })
         toast.success('✓ Tarea finalizada')
@@ -255,8 +256,15 @@ export default function Tasks() {
   }
 
   const handleVerify = async (task) => {
-    try { await updateTask(task.id, { status: 'done' }); toast.success('✓ Verificada y cerrada') }
-    catch { toast.error('Error al verificar') }
+    try {
+      if (task.type === 'recurring' && task.recurrence) {
+        await completeAndRecur(task, currentUser.uid)
+        toast.success('✓ Verificada y cerrada. Próxima ocurrencia creada.')
+      } else {
+        await updateTask(task.id, { status: 'done' })
+        toast.success('✓ Verificada y cerrada')
+      }
+    } catch { toast.error('Error al verificar') }
   }
 
   const canEdit = (task) => isAdmin || task.assignedTo === currentUser?.uid

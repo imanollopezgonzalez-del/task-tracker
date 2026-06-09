@@ -95,12 +95,12 @@ export const completeAndRecur = async (task, userId) => {
     updatedAt: serverTimestamp(),
   })
   if (task.type === 'recurring' && task.recurrence) {
-    // Calcular fecha base: si no tiene fecha límite, usar hoy
-    const base = task.dueDate?.toDate
+    // Base siempre es hoy para daily/weekly/monthly; annual conserva la fecha original
+    const todayBase = new Date()
+    const originalBase = task.dueDate?.toDate
       ? task.dueDate.toDate()
-      : task.dueDate
-        ? new Date(task.dueDate)
-        : new Date()
+      : task.dueDate ? new Date(task.dueDate) : todayBase
+    const base = task.recurrence === 'annual' ? originalBase : todayBase
 
     let nextDate
     const cfg = task.recurrenceConfig || {}
