@@ -30,6 +30,12 @@ service cloud.firestore {
       allow read: if signed() && myCompany() == resource.data.companyId;
       allow create: if signed() && myCompany() == request.resource.data.companyId;
       allow update, delete: if signed() && myCompany() == resource.data.companyId;
+
+      // Comentarios de la tarea (subcolección — requiere regla propia)
+      match /comments/{commentId} {
+        allow read, create: if signed() && myCompany() == get(/databases/$(database)/documents/tasks/$(taskId)).data.companyId;
+        allow update, delete: if signed() && uid() == resource.data.authorId;
+      }
     }
 
     // Notificaciones
