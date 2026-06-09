@@ -37,14 +37,14 @@ function filterByView(tasks, view) {
     const start = toDate(t.startDate)
     const now = new Date()
 
-    // Recurrentes: visibilidad por patrón, no por dueDate exacto
+    // Recurrentes: visibilidad por patrón con cutoff adaptado a cada vista
     if (t.type === 'recurring' && t.recurrence) {
-      const startRef = start || due
-      // No mostrar si la tarea aún no empezó
-      if (startRef && isBefore(startOfDay(now), startRef)) return false
-
       const cfg = t.recurrenceConfig || {}
+      const startRef = start || due
+
       if (view === 'today') {
+        // Hoy: ocultar si la tarea todavía no comenzó
+        if (startRef && isBefore(startOfDay(now), startRef)) return false
         if (t.recurrence === 'daily') return true
         if (t.recurrence === 'weekly') {
           const days = cfg.days?.length ? cfg.days : [1, 2, 3, 4, 5]
@@ -60,33 +60,42 @@ function filterByView(tasks, view) {
         }
         return false
       }
+
       if (view === 'week') {
+        const wStart = startOfWeek(now, { weekStartsOn: 1 })
+        const wEnd = endOfWeek(now, { weekStartsOn: 1 })
+        // Ocultar solo si la tarea empieza después de que termina esta semana
+        if (startRef && startRef > wEnd) return false
         if (t.recurrence === 'daily' || t.recurrence === 'weekly') return true
         if (t.recurrence === 'monthly') {
           const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
           if (!dom) return false
-          const wStart = startOfWeek(now, { weekStartsOn: 1 })
-          const wEnd = endOfWeek(now, { weekStartsOn: 1 })
           const sched = new Date(now.getFullYear(), now.getMonth(), dom)
           return sched >= wStart && sched <= wEnd
         }
         if (t.recurrence === 'annual') {
           const base = due || start
           if (!base) return false
-          const wStart = startOfWeek(now, { weekStartsOn: 1 })
-          const wEnd = endOfWeek(now, { weekStartsOn: 1 })
           const sched = new Date(now.getFullYear(), base.getMonth(), base.getDate())
           return sched >= wStart && sched <= wEnd
         }
         return false
       }
+
       if (view === 'month') {
+        // Ocultar solo si la tarea empieza en un mes futuro (mes siguiente o después)
+        if (startRef) {
+          const sy = startRef.getFullYear(), sm = startRef.getMonth()
+          const ny = now.getFullYear(), nm = now.getMonth()
+          if (sy > ny || (sy === ny && sm > nm)) return false
+        }
         if (t.recurrence === 'annual') {
           const base = due || start
           return base ? base.getMonth() === now.getMonth() : false
         }
         return true
       }
+
       return false
     }
 
