@@ -47,7 +47,7 @@ function filterByView(tasks, view) {
       if (view === 'today') {
         if (t.recurrence === 'daily') return true
         if (t.recurrence === 'weekly') {
-          const days = cfg.days?.length ? cfg.days : [1]
+          const days = cfg.days?.length ? cfg.days : [1, 2, 3, 4, 5]
           return days.includes(now.getDay())
         }
         if (t.recurrence === 'monthly') {

@@ -60,7 +60,7 @@ export default function CalendarView() {
           return diff >= 0 && diff % every === 0
         }
         if (t.recurrence === 'weekly') {
-          const days = cfg.days?.length ? cfg.days : [1]
+          const days = cfg.days?.length ? cfg.days : [1, 2, 3, 4, 5]
           return days.includes(day.getDay())
         }
         if (t.recurrence === 'monthly') {
