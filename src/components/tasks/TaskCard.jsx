@@ -1,10 +1,10 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import PriorityBadge from '../ui/PriorityBadge'
 import StatusBadge from '../ui/StatusBadge'
 import Avatar from '../ui/Avatar'
 import { formatRelative, isOverdue, isDueSoon } from '../../utils/dates'
 import { RECURRENCES } from '../../utils/constants'
-import { Calendar, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { Calendar, RefreshCw, AlertCircle, CheckCircle2, GripVertical } from 'lucide-react'
 
 const tsToDate = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
 
@@ -29,21 +29,46 @@ function getRecurrencePattern(task) {
   }
 }
 
-export default function TaskCard({ task, users = [], onEdit, onComplete, compact = false }) {
+export default function TaskCard({
+  task, users = [], onEdit, onComplete, onVerify, compact = false,
+  sortable = false, onDragStart, onDragEnter, onDrop,
+}) {
+  const [dragging, setDragging] = useState(false)
   const assignee = users.find((u) => u.uid === task.assignedTo)
   const verifier = users.find((u) => u.uid === task.verifiedBy)
   const isDone = task.status === 'done'
 
   const isRecurring = task.type === 'recurring' && !!task.recurrence
-  // Para recurrentes, usar startDate como fallback si no hay dueDate
   const effectiveDate = task.dueDate || (isRecurring ? task.startDate : null)
   const overdue = isOverdue(effectiveDate, task.status)
   const dueSoon = isDueSoon(effectiveDate, task.status)
   const patternLabel = isRecurring ? getRecurrencePattern(task) : ''
 
   return (
-    <div className={`card hover:shadow-card-hover transition-all duration-200 group ${overdue ? 'border-red-200' : ''} ${isDone ? 'opacity-70' : ''}`}>
-      <Link to={`/tasks/${task.id}`} className="block p-4">
+    <div
+      draggable={sortable}
+      onDragStart={sortable ? (e) => { e.stopPropagation(); setDragging(true); onDragStart?.(task.id) } : undefined}
+      onDragEnd={sortable ? () => setDragging(false) : undefined}
+      onDragEnter={sortable ? (e) => { e.preventDefault(); onDragEnter?.(task.id) } : undefined}
+      onDragOver={sortable ? (e) => e.preventDefault() : undefined}
+      onDrop={sortable ? (e) => { e.preventDefault(); onDrop?.() } : undefined}
+      onClick={() => { if (onEdit && !isDone) onEdit(task) }}
+      className={[
+        'card hover:shadow-card-hover transition-all duration-200 group relative',
+        onEdit && !isDone ? 'cursor-pointer' : '',
+        overdue ? 'border-red-200' : '',
+        isDone ? 'opacity-70' : '',
+        dragging ? 'opacity-40 scale-95' : '',
+        sortable ? 'pl-6' : '',
+      ].join(' ')}
+    >
+      {sortable && (
+        <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-brand-text-muted opacity-0 group-hover:opacity-40 cursor-grab active:cursor-grabbing select-none">
+          <GripVertical size={14} />
+        </div>
+      )}
+
+      <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
             <PriorityBadge priority={task.priority} />
@@ -57,9 +82,10 @@ export default function TaskCard({ task, users = [], onEdit, onComplete, compact
           </div>
           {!isDone && onComplete && (
             <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onComplete(task) }}
+              onClick={(e) => { e.stopPropagation(); onComplete(task) }}
               title="Marcar como finalizada"
-              className="flex-shrink-0 p-1.5 rounded-lg text-green-500 hover:bg-green-50 hover:text-green-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+              className="flex-shrink-0 p-1.5 rounded-lg text-green-500 hover:bg-green-50 hover:text-green-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+            >
               <CheckCircle2 size={20} />
             </button>
           )}
@@ -113,13 +139,15 @@ export default function TaskCard({ task, users = [], onEdit, onComplete, compact
             ) : null}
           </div>
         </div>
-      </Link>
+      </div>
 
-      {onEdit && !isDone && (
-        <div className="px-4 pb-3 pt-0 flex gap-2 border-t border-brand-border mt-1">
-          <button onClick={(e) => { e.preventDefault(); onEdit(task) }}
-            className="text-xs text-brand-text-muted hover:text-brand-text font-medium transition-colors">
-            Editar
+      {onVerify && task.status === 'pending_response' && (
+        <div className="px-4 pb-3 border-t border-brand-border">
+          <button
+            onClick={(e) => { e.stopPropagation(); onVerify(task) }}
+            className="w-full mt-2 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+          >
+            ✓ Verificar y cerrar
           </button>
         </div>
       )}

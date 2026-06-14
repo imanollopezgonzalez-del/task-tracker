@@ -7,7 +7,7 @@ export const PRIORITIES = {
 export const STATUSES = {
   not_started: { label: 'Sin comenzar', color: 'text-task-not-started', bg: 'bg-task-not-started-bg', dot: 'bg-task-not-started', next: 'in_progress' },
   in_progress: { label: 'En curso', color: 'text-task-in-progress', bg: 'bg-task-in-progress-bg', dot: 'bg-task-in-progress', next: 'pending_response' },
-  pending_response: { label: 'Pend. Respuesta', color: 'text-task-pending-response', bg: 'bg-task-pending-response-bg', dot: 'bg-task-pending-response', next: 'pending_adjustments' },
+  pending_response: { label: 'Pendiente Revisión', color: 'text-task-pending-response', bg: 'bg-task-pending-response-bg', dot: 'bg-task-pending-response', next: 'pending_adjustments' },
   pending_adjustments: { label: 'Pend. Ajustes', color: 'text-task-pending-adjustments', bg: 'bg-task-pending-adjustments-bg', dot: 'bg-task-pending-adjustments', next: 'done' },
   done: { label: 'Finalizado', color: 'text-task-done', bg: 'bg-task-done-bg', dot: 'bg-task-done', next: null },
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useTasks } from '../contexts/TaskContext'
 import { useAuth } from '../contexts/AuthContext'
 import Header from '../components/layout/Header'
@@ -12,6 +12,14 @@ import { useUsers } from '../hooks/useUsers'
 import { updateTask, completeAndRecur } from '../services/tasks'
 import { createNotification } from '../services/notifications'
 import toast from 'react-hot-toast'
+
+function applyOrder(tasks, order) {
+  if (!order.length) return tasks
+  const map = Object.fromEntries(tasks.map((t) => [t.id, t]))
+  const ordered = order.filter((id) => map[id]).map((id) => map[id])
+  const fresh = tasks.filter((t) => !order.includes(t.id))
+  return [...ordered, ...fresh]
+}
 
 const SORT_OPTS = [
   { value: 'priority', label: 'Urgencia' },
@@ -218,6 +226,17 @@ export default function Tasks() {
   const recurringCol = useColState()
   const supervisionCol = useColState()
 
+  const [normalOrder, setNormalOrder] = useState([])
+  const [recurringOrder, setRecurringOrder] = useState([])
+  const [supervisionOrder, setSupervisionOrder] = useState([])
+  const dragSrc = useRef(null)
+  const dragOver = useRef(null)
+  const displayRef = useRef({ normal: [], recurring: [], supervision: [] })
+
+  useEffect(() => { setNormalOrder([]) }, [normalCol.sort, normalCol.search, normalCol.priority])
+  useEffect(() => { setRecurringOrder([]) }, [recurringCol.sort, recurringCol.search, recurringCol.priority])
+  useEffect(() => { setSupervisionOrder([]) }, [supervisionCol.sort, supervisionCol.search, supervisionCol.priority])
+
   const sourceTasks = useMemo(() => {
     if (!isAdmin) return myTasks
     if (selectedUid === 'all') return allTasks
@@ -262,6 +281,28 @@ export default function Tasks() {
   const filteredNormal = useMemo(() => applyColumnFilter(normalTasks, normalCol.sort, normalCol.search, normalCol.priority), [normalTasks, normalCol.sort, normalCol.search, normalCol.priority])
   const filteredRecurring = useMemo(() => applyColumnFilter(recurringTasks, recurringCol.sort, recurringCol.search, recurringCol.priority), [recurringTasks, recurringCol.sort, recurringCol.search, recurringCol.priority])
   const filteredSupervision = useMemo(() => applyColumnFilter(supervisionTasks, supervisionCol.sort, supervisionCol.search, supervisionCol.priority), [supervisionTasks, supervisionCol.sort, supervisionCol.search, supervisionCol.priority])
+
+  const displayNormal = useMemo(() => applyOrder(filteredNormal, normalOrder), [filteredNormal, normalOrder])
+  const displayRecurring = useMemo(() => applyOrder(filteredRecurring, recurringOrder), [filteredRecurring, recurringOrder])
+  const displaySupervision = useMemo(() => applyOrder(filteredSupervision, supervisionOrder), [filteredSupervision, supervisionOrder])
+  displayRef.current = { normal: displayNormal, recurring: displayRecurring, supervision: displaySupervision }
+
+  const reorderCol = (col, setOrder) => {
+    if (dragSrc.current?.col !== col) { dragSrc.current = null; dragOver.current = null; return }
+    const src = dragSrc.current.id
+    const over = dragOver.current
+    if (!src || !over || src === over) { dragSrc.current = null; dragOver.current = null; return }
+    const ids = displayRef.current[col].map((t) => t.id)
+    const fi = ids.indexOf(src)
+    const ti = ids.indexOf(over)
+    if (fi < 0 || ti < 0) { dragSrc.current = null; dragOver.current = null; return }
+    const next = [...ids]
+    next.splice(fi, 1)
+    next.splice(ti, 0, src)
+    setOrder(next)
+    dragSrc.current = null
+    dragOver.current = null
+  }
 
   const handleEdit = (task) => { setEditTask(task); setShowModal(true) }
   const handleClose = () => { setShowModal(false); setEditTask(null) }
@@ -354,49 +395,65 @@ export default function Tasks() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div>
-            <ColumnHeader title="Tareas" icon={CheckSquare} iconColor="text-brand-orange" count={filteredNormal.length} {...normalCol} />
+            <ColumnHeader title="Tareas" icon={CheckSquare} iconColor="text-brand-orange" count={displayNormal.length} {...normalCol} />
             <div className="space-y-2">
-              {filteredNormal.length === 0 ? (
+              {displayNormal.length === 0 ? (
                 <div className="rounded-xl border-2 border-dashed border-brand-border py-8 text-center">
                   <p className="text-xs text-brand-text-light">Sin tareas</p>
                 </div>
-              ) : filteredNormal.map((task) => (
-                <TaskCard key={task.id} task={task} users={users} onEdit={canEdit(task) ? handleEdit : null} onComplete={handleComplete} />
+              ) : displayNormal.map((task) => (
+                <TaskCard
+                  key={task.id} task={task} users={users}
+                  onEdit={canEdit(task) ? handleEdit : null}
+                  onComplete={handleComplete}
+                  sortable
+                  onDragStart={(id) => { dragSrc.current = { id, col: 'normal' } }}
+                  onDragEnter={(id) => { dragOver.current = id }}
+                  onDrop={() => reorderCol('normal', setNormalOrder)}
+                />
               ))}
             </div>
           </div>
 
           <div>
-            <ColumnHeader title="Recurrentes" icon={RefreshCw} iconColor="text-blue-500" count={filteredRecurring.length} {...recurringCol} />
+            <ColumnHeader title="Recurrentes" icon={RefreshCw} iconColor="text-blue-500" count={displayRecurring.length} {...recurringCol} />
             <div className="space-y-2">
-              {filteredRecurring.length === 0 ? (
+              {displayRecurring.length === 0 ? (
                 <div className="rounded-xl border-2 border-dashed border-brand-border py-8 text-center">
                   <p className="text-xs text-brand-text-light">Sin recurrentes</p>
                 </div>
-              ) : filteredRecurring.map((task) => (
-                <TaskCard key={task.id} task={task} users={users} onEdit={canEdit(task) ? handleEdit : null} onComplete={handleComplete} />
+              ) : displayRecurring.map((task) => (
+                <TaskCard
+                  key={task.id} task={task} users={users}
+                  onEdit={canEdit(task) ? handleEdit : null}
+                  onComplete={handleComplete}
+                  sortable
+                  onDragStart={(id) => { dragSrc.current = { id, col: 'recurring' } }}
+                  onDragEnter={(id) => { dragOver.current = id }}
+                  onDrop={() => reorderCol('recurring', setRecurringOrder)}
+                />
               ))}
             </div>
           </div>
 
           <div>
-            <ColumnHeader title="Supervisión" icon={Eye} iconColor="text-amber-500" count={filteredSupervision.length} {...supervisionCol} />
+            <ColumnHeader title="Supervisión" icon={Eye} iconColor="text-amber-500" count={displaySupervision.length} {...supervisionCol} />
             <div className="space-y-2">
-              {filteredSupervision.length === 0 ? (
+              {displaySupervision.length === 0 ? (
                 <div className="rounded-xl border-2 border-dashed border-brand-border py-8 text-center">
                   <p className="text-xs text-brand-text-light">Sin supervisión</p>
                 </div>
-              ) : filteredSupervision.map((task) => (
-                <div key={task.id}>
-                  <TaskCard task={task} users={users} onEdit={isAdmin ? handleEdit : null}
-                    onComplete={task.status === 'pending_response' ? handleVerify : handleComplete} />
-                  {task.status === 'pending_response' && (
-                    <button onClick={() => handleVerify(task)}
-                      className="w-full mt-1 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-                      ✓ Verificar y cerrar
-                    </button>
-                  )}
-                </div>
+              ) : displaySupervision.map((task) => (
+                <TaskCard
+                  key={task.id} task={task} users={users}
+                  onEdit={isAdmin ? handleEdit : null}
+                  onComplete={task.status !== 'pending_response' ? handleComplete : undefined}
+                  onVerify={task.status === 'pending_response' ? handleVerify : undefined}
+                  sortable
+                  onDragStart={(id) => { dragSrc.current = { id, col: 'supervision' } }}
+                  onDragEnter={(id) => { dragOver.current = id }}
+                  onDrop={() => reorderCol('supervision', setSupervisionOrder)}
+                />
               ))}
             </div>
           </div>
