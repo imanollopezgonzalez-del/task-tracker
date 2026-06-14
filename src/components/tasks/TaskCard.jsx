@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import PriorityBadge from '../ui/PriorityBadge'
 import StatusBadge from '../ui/StatusBadge'
 import Avatar from '../ui/Avatar'
 import { formatRelative, isOverdue, isDueSoon } from '../../utils/dates'
 import { RECURRENCES } from '../../utils/constants'
-import { Calendar, RefreshCw, AlertCircle, CheckCircle2, GripVertical } from 'lucide-react'
+import { Calendar, RefreshCw, AlertCircle, CheckCircle2, GripVertical, Pencil } from 'lucide-react'
 
 const tsToDate = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
 
@@ -52,10 +53,8 @@ export default function TaskCard({
       onDragEnter={sortable ? (e) => { e.preventDefault(); onDragEnter?.(task.id) } : undefined}
       onDragOver={sortable ? (e) => e.preventDefault() : undefined}
       onDrop={sortable ? (e) => { e.preventDefault(); onDrop?.() } : undefined}
-      onClick={() => { if (onEdit && !isDone) onEdit(task) }}
       className={[
         'card hover:shadow-card-hover transition-all duration-200 group relative',
-        onEdit && !isDone ? 'cursor-pointer' : '',
         overdue ? 'border-red-200' : '',
         isDone ? 'opacity-70' : '',
         dragging ? 'opacity-40 scale-95' : '',
@@ -68,7 +67,7 @@ export default function TaskCard({
         </div>
       )}
 
-      <div className="p-4">
+      <Link to={`/tasks/${task.id}`} className="block p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
             <PriorityBadge priority={task.priority} />
@@ -80,15 +79,26 @@ export default function TaskCard({
               </span>
             )}
           </div>
-          {!isDone && onComplete && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onComplete(task) }}
-              title="Marcar como finalizada"
-              className="flex-shrink-0 p-1.5 rounded-lg text-green-500 hover:bg-green-50 hover:text-green-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-            >
-              <CheckCircle2 size={20} />
-            </button>
-          )}
+          <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
+            {onEdit && !isDone && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(task) }}
+                title="Editar"
+                className="p-1.5 rounded-lg text-brand-text-muted hover:bg-brand-bg-2 hover:text-brand-text transition-colors"
+              >
+                <Pencil size={15} />
+              </button>
+            )}
+            {!isDone && onComplete && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onComplete(task) }}
+                title="Marcar como finalizada"
+                className="p-1.5 rounded-lg text-green-500 hover:bg-green-50 hover:text-green-600 transition-colors"
+              >
+                <CheckCircle2 size={20} />
+              </button>
+            )}
+          </div>
         </div>
 
         <h3 className={`text-sm font-semibold text-brand-text leading-snug mb-1 ${isDone ? 'line-through opacity-60' : ''}`}>
@@ -139,7 +149,7 @@ export default function TaskCard({
             ) : null}
           </div>
         </div>
-      </div>
+      </Link>
 
       {onVerify && task.status === 'pending_response' && (
         <div className="px-4 pb-3 border-t border-brand-border">
