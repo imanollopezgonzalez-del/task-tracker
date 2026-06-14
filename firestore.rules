@@ -56,6 +56,7 @@ service cloud.firestore {
 
       match /notas/{notaId} {
         allow read, create: if hasCrm() && myCompany() == get(/databases/$(database)/documents/leads/$(leadId)).data.companyId;
+        allow update: if hasCrm() && (uid() == resource.data.autorId || myData().role == 'admin');
         allow delete: if hasCrm() && (uid() == resource.data.autorId || myData().role == 'admin');
       }
     }
