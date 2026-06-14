@@ -5,7 +5,7 @@ import {
   CheckCircle, XCircle, StickyNote, AlertCircle, Send,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { getLead, updateLead, deleteLead, addNota, subscribeNotas, deleteNota } from '../../services/leads'
+import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
 import { LEAD_STAGES, PIPELINE_STEPS, TIPOS_CLIENTE, NOTE_TYPES } from '../../utils/crmConstants'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
@@ -53,10 +53,21 @@ function InfoRow({ icon: Icon, label, value }) {
   )
 }
 
-function NotaItem({ nota, onDelete, canDelete }) {
+function NotaItem({ nota, onDelete, onEdit, canDelete }) {
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(nota.texto)
+  const [saving, setSaving] = useState(false)
   const isImportante = nota.tipo === 'importante'
   const ts = nota.createdAt?.toDate ? nota.createdAt.toDate() : new Date()
   const dateStr = ts.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+
+  const handleSave = async () => {
+    if (!editText.trim()) return
+    setSaving(true)
+    await onEdit(nota.id, editText.trim())
+    setSaving(false)
+    setEditing(false)
+  }
 
   return (
     <div className={`rounded-xl border p-3 ${isImportante ? 'bg-orange-50 border-orange-200' : 'bg-brand-bg-2 border-brand-border'}`}>
@@ -66,19 +77,42 @@ function NotaItem({ nota, onDelete, canDelete }) {
             ? <AlertCircle size={14} className="text-brand-orange mt-0.5 flex-shrink-0" />
             : <StickyNote size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
           }
-          <p className="text-sm text-brand-text whitespace-pre-wrap break-words">{nota.texto}</p>
+          {editing ? (
+            <div className="flex-1">
+              <textarea
+                className="w-full text-sm text-brand-text resize-none outline-none bg-white border border-brand-border rounded-lg px-2 py-1.5"
+                rows={3}
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                autoFocus
+              />
+              <div className="flex gap-2 mt-1.5">
+                <button onClick={handleSave} disabled={saving} className="btn-primary py-0.5 px-2 text-xs">
+                  {saving ? 'Guardando...' : 'Guardar'}
+                </button>
+                <button onClick={() => { setEditing(false); setEditText(nota.texto) }} className="btn-secondary py-0.5 px-2 text-xs">
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-brand-text whitespace-pre-wrap break-words">{nota.texto}</p>
+          )}
         </div>
-        {canDelete && (
-          <button
-            onClick={() => onDelete(nota.id)}
-            className="text-brand-text-muted hover:text-red-500 p-0.5 flex-shrink-0"
-          >
-            <Trash2 size={13} />
-          </button>
+        {!editing && canDelete && (
+          <div className="flex items-center gap-0.5 flex-shrink-0">
+            <button onClick={() => setEditing(true)} className="text-brand-text-muted hover:text-brand-text p-0.5" title="Editar">
+              <Edit2 size={13} />
+            </button>
+            <button onClick={() => onDelete(nota.id)} className="text-brand-text-muted hover:text-red-500 p-0.5" title="Eliminar">
+              <Trash2 size={13} />
+            </button>
+          </div>
         )}
       </div>
       <p className="text-xs text-brand-text-muted mt-1.5 ml-5">
         {nota.autorNombre} · {dateStr}
+        {nota.editedAt && <span className="italic ml-1">(editado)</span>}
       </p>
     </div>
   )
@@ -118,11 +152,20 @@ export default function LeadDetail() {
     toast.success(`Estado actualizado a "${LEAD_STAGES[newStage]?.label}"`)
   }
 
-  const handleContactadoToggle = async () => {
-    const newVal = !lead.contactado
-    await updateLead(id, { contactado: newVal })
-    setLead((l) => ({ ...l, contactado: newVal }))
-    toast.success(newVal ? 'Marcado como contactado' : 'Marcado como no contactado')
+  const handleContactado = async () => {
+    await updateLead(id, { contactado: true })
+    setLead((l) => ({ ...l, contactado: true }))
+    toast.success('Lead marcado como contactado')
+  }
+
+  const handleNoContactado = async () => {
+    await updateLead(id, { contactado: false, estado: 'reintentar_contacto' })
+    setLead((l) => ({ ...l, contactado: false, estado: 'reintentar_contacto' }))
+    toast.success('Estado cambiado a "Reintentar contacto"')
+  }
+
+  const handleEditNota = async (notaId, texto) => {
+    await updateNota(id, notaId, texto)
   }
 
   const handleDelete = async () => {
@@ -180,17 +223,26 @@ export default function LeadDetail() {
           <h1 className="text-base font-bold text-brand-text flex-1 truncate">{lead.nombre}</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleContactadoToggle}
+              onClick={handleContactado}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                 lead.contactado
-                  ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                  : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                  ? 'bg-green-500 text-white border-green-500'
+                  : 'bg-white text-green-700 border-green-200 hover:bg-green-50'
               }`}
             >
-              {lead.contactado
-                ? <><CheckCircle size={13} /> Contactado</>
-                : <><XCircle size={13} /> No contactado</>
-              }
+              <CheckCircle size={13} />
+              Contactado
+            </button>
+            <button
+              onClick={handleNoContactado}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                lead.estado === 'reintentar_contacto'
+                  ? 'bg-red-500 text-white border-red-500'
+                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+              }`}
+            >
+              <XCircle size={13} />
+              No contactado
             </button>
             <button onClick={() => setShowEdit(true)} className="btn-ghost p-1.5" title="Editar">
               <Edit2 size={15} />
@@ -239,6 +291,7 @@ export default function LeadDetail() {
                 key={nota.id}
                 nota={nota}
                 onDelete={handleDeleteNota}
+                onEdit={handleEditNota}
                 canDelete={nota.autorId === currentUser?.uid || userProfile?.role === 'admin'}
               />
             ))}
@@ -332,12 +385,6 @@ export default function LeadDetail() {
             <div className="py-2 border-b border-brand-border">
               <p className="text-xs text-brand-text-muted mb-1">Origen del contacto</p>
               <span className="text-sm font-medium text-brand-text">{lead.origenContacto}</span>
-            </div>
-          )}
-          {lead.observaciones && (
-            <div className="py-2">
-              <p className="text-xs text-brand-text-muted mb-1">Observaciones</p>
-              <p className="text-sm text-brand-text whitespace-pre-wrap">{lead.observaciones}</p>
             </div>
           )}
         </div>

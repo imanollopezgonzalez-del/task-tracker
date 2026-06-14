@@ -66,5 +66,5 @@ export const RESPONSABLES = [
 
 export const NOTE_TYPES = {
   nota: { label: 'Nota', color: 'bg-brand-bg-2 border-brand-border' },
-  importante: { label: 'IMPORTANTE', color: 'bg-orange-50 border-orange-200' },
+  importante: { label: 'Importante', color: 'bg-orange-50 border-orange-200' },
 }

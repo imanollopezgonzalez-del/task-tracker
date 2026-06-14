@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { createLead, updateLead } from '../../services/leads'
+import { createLead, updateLead, addNota } from '../../services/leads'
 import {
   LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, PUESTOS,
   ORIGENES_CONTACTO, RESPONSABLES,
@@ -60,7 +60,10 @@ export default function LeadForm({ lead, companyId, onClose }) {
         await updateLead(lead.id, payload)
         toast.success('Lead actualizado')
       } else {
-        await createLead(payload, currentUser.uid)
+        const leadId = await createLead(payload, currentUser.uid)
+        if (form.observaciones.trim()) {
+          await addNota(leadId, form.observaciones.trim(), 'nota', currentUser)
+        }
         toast.success('Lead creado')
       }
       onClose()

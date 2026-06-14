@@ -53,6 +53,13 @@ export const addNota = async (leadId, texto, tipo, user) => {
   await updateDoc(doc(db, LEADS_COL, leadId), { updatedAt: serverTimestamp() })
 }
 
+export const updateNota = async (leadId, notaId, texto) => {
+  await updateDoc(doc(db, LEADS_COL, leadId, NOTAS_SUB, notaId), {
+    texto,
+    editedAt: serverTimestamp(),
+  })
+}
+
 export const deleteNota = async (leadId, notaId) => {
   await deleteDoc(doc(db, LEADS_COL, leadId, NOTAS_SUB, notaId))
 }
