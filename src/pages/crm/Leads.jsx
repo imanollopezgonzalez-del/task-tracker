@@ -216,7 +216,7 @@ export default function Leads() {
             <User size={40} className="mb-3 opacity-30" />
             <p className="text-sm font-medium">No hay leads</p>
             <p className="text-xs mt-1">
-              {search || filterTipo || filterProducto || filterResponsable || filterContactado
+              {search || filterTipo || filterProducto || filterResponsable
                 ? 'Probá cambiando los filtros'
                 : 'Hacé clic en "Agregar empresa" para empezar'}
             </p>
