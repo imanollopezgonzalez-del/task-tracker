@@ -212,8 +212,17 @@ export default function Contactos() {
     if (!cardId) return
     const card = contactos.find((c) => c.id === cardId)
     if (!card || card.estadoContacto === targetStage) return
-    await updateLead(cardId, { estadoContacto: targetStage })
-    toast.success(`Movido a "${CONTACTO_STAGES[targetStage]?.label}"`)
+
+    if (targetStage === 'ganado') {
+      await updateLead(cardId, { registroTipo: 'cliente', estadoContacto: 'ganado' })
+      toast.success('¡Ganado! Movido a Clientes')
+    } else if (targetStage === 'perdido') {
+      await updateLead(cardId, { registroTipo: 'lead', estado: 'reintentar_contacto', estadoContacto: null, esCliente: false })
+      toast.success('Volvió a Leads como "Reintentar contacto"')
+    } else {
+      await updateLead(cardId, { estadoContacto: targetStage })
+      toast.success(`Movido a "${CONTACTO_STAGES[targetStage]?.label}"`)
+    }
   }
 
   const sortProps = { sortKey, sortDir, onSort: handleSort }
