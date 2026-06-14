@@ -43,5 +43,21 @@ service cloud.firestore {
       allow read, update, delete: if signed() && uid() == resource.data.recipientId;
       allow create: if signed();
     }
+
+    // CRM - Leads (solo usuarios con crmAccess o admin)
+    function hasCrm() {
+      return signed() && (myData().role == 'admin' || myData().crmAccess == true);
+    }
+
+    match /leads/{leadId} {
+      allow read: if hasCrm() && myCompany() == resource.data.companyId;
+      allow create: if hasCrm() && myCompany() == request.resource.data.companyId;
+      allow update, delete: if hasCrm() && myCompany() == resource.data.companyId;
+
+      match /notas/{notaId} {
+        allow read, create: if hasCrm() && myCompany() == get(/databases/$(database)/documents/leads/$(leadId)).data.companyId;
+        allow delete: if hasCrm() && (uid() == resource.data.autorId || myData().role == 'admin');
+      }
+    }
   }
 }

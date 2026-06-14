@@ -11,6 +11,8 @@ import KPI from './pages/KPI'
 import Admin from './pages/Admin'
 import Settings from './pages/Settings'
 import CalendarView from './pages/CalendarView'
+import Leads from './pages/crm/Leads'
+import LeadDetail from './pages/crm/LeadDetail'
 import Spinner from './components/ui/Spinner'
 
 function ProtectedRoute({ children }) {
@@ -43,6 +45,8 @@ function AppRoutes() {
       <Route path="/calendar" element={<ProtectedRoute><CalendarView /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/crm/leads" element={<ProtectedRoute><Leads /></ProtectedRoute>} />
+      <Route path="/crm/leads/:id" element={<ProtectedRoute><LeadDetail /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/tasks" replace />} />
     </Routes>
   )

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X } from 'lucide-react'
+import { CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X, Mail, UserPlus, Contact, Briefcase, TrendingUp } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from 'react'
 import Avatar from '../ui/Avatar'
@@ -18,10 +18,20 @@ const ADMIN_NAV = [
   { to: '/settings', icon: Settings, label: 'Ajustes' },
 ]
 
+// Sección CRM - solo para admin o usuarios con crmAccess
+const CRM_NAV = [
+  { to: '/crm/mailing', icon: Mail, label: 'Mailing', disabled: true },
+  { to: '/crm/leads', icon: UserPlus, label: 'Leads' },
+  { to: '/crm/contactos', icon: Contact, label: 'Contactos', disabled: true },
+  { to: '/crm/clientes', icon: Briefcase, label: 'Clientes', disabled: true },
+  { to: '/crm/panel', icon: TrendingUp, label: 'Panel de ventas', disabled: true },
+]
+
 function SidebarContent({ onClose }) {
   const { userProfile, logout } = useAuth()
   const navigate = useNavigate()
   const isAdmin = userProfile?.role === 'admin'
+  const hasCrm = isAdmin || userProfile?.crmAccess === true
   const navItems = isAdmin ? ADMIN_NAV : MEMBER_NAV
 
   const handleLogout = async () => {
@@ -57,6 +67,32 @@ function SidebarContent({ onClose }) {
             <span>{item.label}</span>
           </NavLink>
         ))}
+
+        {hasCrm && (
+          <>
+            <div className="px-3 pt-3 pb-1">
+              <p className="text-white/30 text-[10px] font-semibold uppercase tracking-widest">Clientes</p>
+            </div>
+            {CRM_NAV.map((item) =>
+              item.disabled ? (
+                <div
+                  key={item.to}
+                  className="sidebar-item sidebar-item-inactive opacity-40 cursor-not-allowed"
+                  title="Próximamente"
+                >
+                  <item.icon size={18} />
+                  <span>{item.label}</span>
+                </div>
+              ) : (
+                <NavLink key={item.to} to={item.to} onClick={onClose}
+                  className={({ isActive }) => `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`}>
+                  <item.icon size={18} />
+                  <span>{item.label}</span>
+                </NavLink>
+              )
+            )}
+          </>
+        )}
       </nav>
 
       <div className="px-2 pb-4 pt-2 border-t border-white/10 mt-2">
