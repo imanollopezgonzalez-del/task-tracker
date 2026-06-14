@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { createLead, updateLead } from '../../services/leads'
 import {
   LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, PUESTOS,
-  ORIGENES_CONTACTO, GRUPOS_LEADS, RESPONSABLES,
+  ORIGENES_CONTACTO, RESPONSABLES,
 } from '../../utils/crmConstants'
 import toast from 'react-hot-toast'
 
@@ -21,7 +21,7 @@ const EMPTY = {
   ubicacion: '',
   responsable: '',
   origenContacto: '',
-  grupo: '',
+  observaciones: '',
 }
 
 export default function LeadForm({ lead, companyId, onClose }) {
@@ -42,7 +42,7 @@ export default function LeadForm({ lead, companyId, onClose }) {
           ubicacion: lead.ubicacion || '',
           responsable: lead.responsable || '',
           origenContacto: lead.origenContacto || '',
-          grupo: lead.grupo || '',
+          observaciones: lead.observaciones || '',
         }
       : { ...EMPTY }
   )
@@ -50,16 +50,17 @@ export default function LeadForm({ lead, companyId, onClose }) {
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleGuardar = async () => {
     if (!form.nombre.trim()) return toast.error('El nombre es obligatorio')
     setSaving(true)
     try {
+      // grupo = origen del contacto (son lo mismo)
+      const payload = { ...form, companyId, grupo: form.origenContacto }
       if (isEdit) {
-        await updateLead(lead.id, { ...form, companyId })
+        await updateLead(lead.id, payload)
         toast.success('Lead actualizado')
       } else {
-        await createLead({ ...form, companyId }, currentUser.uid)
+        await createLead(payload, currentUser.uid)
         toast.success('Lead creado')
       }
       onClose()
@@ -79,13 +80,13 @@ export default function LeadForm({ lead, companyId, onClose }) {
           <h2 className="text-base font-semibold text-brand-text">
             {isEdit ? 'Editar lead' : 'Agregar lead'}
           </h2>
-          <button onClick={onClose} className="text-brand-text-muted hover:text-brand-text p-1 rounded-lg hover:bg-brand-bg-2">
+          <button type="button" onClick={onClose} className="text-brand-text-muted hover:text-brand-text p-1 rounded-lg hover:bg-brand-bg-2">
             <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
+        <div className="overflow-y-auto px-6 py-5 space-y-4 flex-1">
           {/* Nombre */}
           <div>
             <label className="label">Nombre *</label>
@@ -116,7 +117,7 @@ export default function LeadForm({ lead, companyId, onClose }) {
             </div>
           </div>
 
-          {/* Tipo de cliente + Grupo */}
+          {/* Tipo de cliente + Origen */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Tipo de cliente</label>
@@ -126,10 +127,10 @@ export default function LeadForm({ lead, companyId, onClose }) {
               </select>
             </div>
             <div>
-              <label className="label">Grupo</label>
-              <select className="select-field" value={form.grupo} onChange={(e) => set('grupo', e.target.value)}>
+              <label className="label">Origen del contacto</label>
+              <select className="select-field" value={form.origenContacto} onChange={(e) => set('origenContacto', e.target.value)}>
                 <option value="">— Seleccionar —</option>
-                {GRUPOS_LEADS.map((g) => <option key={g.key} value={g.key}>{g.label}</option>)}
+                {ORIGENES_CONTACTO.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
               </select>
             </div>
           </div>
@@ -169,7 +170,7 @@ export default function LeadForm({ lead, companyId, onClose }) {
               <label className="label">E-mail</label>
               <input
                 className="input-field"
-                type="email"
+                type="text"
                 value={form.email}
                 onChange={(e) => set('email', e.target.value)}
                 placeholder="contacto@empresa.com"
@@ -188,29 +189,32 @@ export default function LeadForm({ lead, companyId, onClose }) {
             />
           </div>
 
-          {/* Responsable + Origen */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Responsable</label>
-              <select className="select-field" value={form.responsable} onChange={(e) => set('responsable', e.target.value)}>
-                <option value="">— Seleccionar —</option>
-                {RESPONSABLES.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="label">Origen del contacto</label>
-              <select className="select-field" value={form.origenContacto} onChange={(e) => set('origenContacto', e.target.value)}>
-                <option value="">— Seleccionar —</option>
-                {ORIGENES_CONTACTO.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
+          {/* Responsable */}
+          <div>
+            <label className="label">Responsable</label>
+            <select className="select-field" value={form.responsable} onChange={(e) => set('responsable', e.target.value)}>
+              <option value="">— Seleccionar —</option>
+              {RESPONSABLES.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
           </div>
-        </form>
+
+          {/* Observaciones */}
+          <div>
+            <label className="label">Observaciones</label>
+            <textarea
+              className="textarea-field"
+              rows={4}
+              value={form.observaciones}
+              onChange={(e) => set('observaciones', e.target.value)}
+              placeholder={"Añadí notas iniciales sobre este lead...\n(Enter para nueva línea)"}
+            />
+          </div>
+        </div>
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-brand-border flex justify-end gap-3">
           <button type="button" onClick={onClose} className="btn-secondary">Cancelar</button>
-          <button onClick={handleSubmit} disabled={saving} className="btn-primary">
+          <button type="button" onClick={handleGuardar} disabled={saving} className="btn-primary">
             {saving ? 'Guardando...' : isEdit ? 'Guardar cambios' : 'Crear lead'}
           </button>
         </div>

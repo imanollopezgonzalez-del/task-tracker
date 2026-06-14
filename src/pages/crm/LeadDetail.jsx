@@ -329,9 +329,15 @@ export default function LeadDetail() {
             </div>
           )}
           {lead.origenContacto && (
-            <div className="py-2">
+            <div className="py-2 border-b border-brand-border">
               <p className="text-xs text-brand-text-muted mb-1">Origen del contacto</p>
               <span className="text-sm font-medium text-brand-text">{lead.origenContacto}</span>
+            </div>
+          )}
+          {lead.observaciones && (
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Observaciones</p>
+              <p className="text-sm text-brand-text whitespace-pre-wrap">{lead.observaciones}</p>
             </div>
           )}
         </div>

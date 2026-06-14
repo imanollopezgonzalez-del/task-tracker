@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Search, ChevronDown, ChevronRight, Phone, Mail, MapPin, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { subscribeLeads } from '../../services/leads'
-import { LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, GRUPOS_LEADS, RESPONSABLES } from '../../utils/crmConstants'
+import { LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, GRUPOS_LISTA, ORIGENES_CONTACTO, RESPONSABLES } from '../../utils/crmConstants'
 import LeadForm from '../../components/crm/LeadForm'
 
 function StageBadge({ estado }) {
@@ -59,7 +59,7 @@ function LeadRow({ lead, onClick }) {
 
 function GroupSection({ grupo, leads, onLeadClick, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
-  const g = GRUPOS_LEADS.find((g) => g.key === grupo) || { label: grupo, color: '#94A3B8' }
+  const g = GRUPOS_LISTA.find((g) => g.key === grupo) || { label: grupo, color: '#94A3B8' }
 
   return (
     <div className="mb-2">
@@ -136,15 +136,23 @@ export default function Leads() {
     })
   }, [leads, search, filterTipo, filterProducto, filterResponsable, filterContactado])
 
-  // Agrupar por grupo, respetando el orden de GRUPOS_LEADS
-  const groupOrder = GRUPOS_LEADS.map((g) => g.key)
+  // Grupos en el orden de GRUPOS_LISTA
+  // Los "No contactados" y "Clientes a Recuperar" son grupos virtuales basados en estado
+  const groupOrder = GRUPOS_LISTA.map((g) => g.key)
   const grouped = useMemo(() => {
     const map = {}
     groupOrder.forEach((k) => { map[k] = [] })
     filtered.forEach((l) => {
-      const g = l.grupo || 'Google Researching'
-      if (!map[g]) map[g] = []
-      map[g].push(l)
+      // Leads con estado especial van a grupos virtuales
+      if (l.estado === 'no_contactado') {
+        map['No contactados'].push(l)
+      } else if (l.estado === 'reintentar_contacto') {
+        map['Clientes a Recuperar'].push(l)
+      } else {
+        const g = l.grupo || l.origenContacto || 'Google Researching'
+        if (!map[g]) map[g] = []
+        map[g].push(l)
+      }
     })
     return map
   }, [filtered])

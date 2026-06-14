@@ -11,7 +11,7 @@ export const LEAD_STAGES = {
   closed: { label: 'Closed', color: 'bg-gray-100 text-gray-500 border-gray-200', dot: 'bg-gray-400', order: 9 },
 }
 
-// Etapas del pipeline (barra de progreso) - solo las etapas de contacto activo
+// Etapas del pipeline (barra de progreso)
 export const PIPELINE_STEPS = ['lead_nuevo', 'email', 'instagram', 'linkedin', 'whatsapp', 'llamada', 'closed']
 
 export const TIPOS_CLIENTE = [
@@ -37,26 +37,26 @@ export const PUESTOS = [
   'Gerente Calidad',
 ]
 
+// Orígenes = grupos reales del lead. El grupo se setea automáticamente desde el origen.
 export const ORIGENES_CONTACTO = [
-  'Google Researching',
-  'Google Ads',
-  'LinkedIn Researching',
-  'LinkedIn Ads',
-  'Email Marketing',
-  'Contactos Lucho',
-  'Instagram',
-]
-
-// Grupos de la tabla principal (fuente + estados especiales)
-export const GRUPOS_LEADS = [
   { key: 'Google Researching', label: 'Google Researching', color: '#4285F4' },
   { key: 'Google Ads', label: 'Google Ads', color: '#34A853' },
   { key: 'LinkedIn Researching', label: 'LinkedIn Researching', color: '#0A66C2' },
+  { key: 'LinkedIn Ads', label: 'LinkedIn Ads', color: '#0A66C2' },
   { key: 'Email Marketing', label: 'Email Marketing', color: '#8B5CF6' },
   { key: 'Contactos Lucho', label: 'Contactos Lucho', color: '#F59E0B' },
-  { key: 'No contactados', label: 'No contactados', color: '#EF4444' },
-  { key: 'Clientes a Recuperar', label: 'Clientes a Recuperar', color: '#D97757' },
+  { key: 'Instagram', label: 'Instagram', color: '#E1306C' },
 ]
+
+// Grupos en la lista: orígenes + grupos especiales basados en estado
+export const GRUPOS_LISTA = [
+  ...ORIGENES_CONTACTO,
+  { key: 'No contactados', label: 'No contactados', color: '#EF4444', virtual: true },
+  { key: 'Clientes a Recuperar', label: 'Clientes a Recuperar', color: '#D97757', virtual: true },
+]
+
+// Compat alias para imports existentes
+export const GRUPOS_LEADS = GRUPOS_LISTA
 
 export const RESPONSABLES = [
   'Imanol Lopez Fuente',
