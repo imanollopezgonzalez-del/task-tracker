@@ -22,9 +22,11 @@ const EMPTY = {
   responsable: '',
   origenContacto: '',
   observaciones: '',
+  kilosMensuales: '',
+  fechaCierre: '',
 }
 
-export default function LeadForm({ lead, companyId, onClose }) {
+export default function LeadForm({ lead, companyId, onClose, showContactoFields = false }) {
   const { currentUser } = useAuth()
   const isEdit = !!lead
   const [form, setForm] = useState(
@@ -48,6 +50,8 @@ export default function LeadForm({ lead, companyId, onClose }) {
           responsable: lead.responsable || '',
           origenContacto: lead.origenContacto || '',
           observaciones: lead.observaciones || '',
+          kilosMensuales: lead.kilosMensuales || '',
+          fechaCierre: lead.fechaCierre || '',
         }
       : { ...EMPTY }
   )
@@ -267,6 +271,32 @@ export default function LeadForm({ lead, companyId, onClose }) {
               {RESPONSABLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
+
+          {/* Kilos mensuales + Fecha cierre (solo en Contactos) */}
+          {showContactoFields && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Kilos mensuales</label>
+                <input
+                  className="input-field"
+                  type="number"
+                  min="0"
+                  value={form.kilosMensuales}
+                  onChange={(e) => set('kilosMensuales', e.target.value)}
+                  placeholder="Ej: 500"
+                />
+              </div>
+              <div>
+                <label className="label">Fecha estimada de cierre</label>
+                <input
+                  className="input-field"
+                  type="date"
+                  value={form.fechaCierre}
+                  onChange={(e) => set('fechaCierre', e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Observaciones */}
           <div>

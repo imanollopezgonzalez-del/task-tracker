@@ -6,18 +6,16 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
-import { LEAD_STAGES, PIPELINE_STEPS, TIPOS_CLIENTE, NOTE_TYPES } from '../../utils/crmConstants'
+import { CONTACTO_STAGES, CONTACTO_PIPELINE, NOTE_TYPES, TIPO_CLIENTE_COLORS } from '../../utils/crmConstants'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
 
 function PipelineBar({ current, onChange }) {
-  const steps = PIPELINE_STEPS.filter((s) => !['no_contactado', 'reintentar_contacto'].includes(s))
-  const currentIdx = steps.indexOf(current)
-
+  const currentIdx = CONTACTO_PIPELINE.indexOf(current)
   return (
     <div className="flex items-center gap-0 overflow-x-auto pb-1">
-      {steps.map((step, i) => {
-        const s = LEAD_STAGES[step]
+      {CONTACTO_PIPELINE.map((step, i) => {
+        const s = CONTACTO_STAGES[step]
         const isActive = step === current
         const isPast = i < currentIdx
         return (
@@ -25,12 +23,12 @@ function PipelineBar({ current, onChange }) {
             key={step}
             onClick={() => onChange(step)}
             className={`
-              flex-1 min-w-[80px] px-3 py-1.5 text-xs font-medium border-y border-r first:border-l first:rounded-l-lg last:rounded-r-lg
-              transition-colors
-              ${isActive ? 'bg-brand-orange text-white border-brand-orange' : ''}
+              flex-1 min-w-[90px] px-2 py-1.5 text-xs font-medium border-y border-r
+              first:border-l first:rounded-l-lg last:rounded-r-lg transition-colors
               ${isPast ? 'bg-green-500 text-white border-green-500' : ''}
               ${!isActive && !isPast ? 'bg-white text-brand-text-muted border-brand-border hover:bg-brand-bg-2' : ''}
             `}
+            style={isActive ? { backgroundColor: s.kanban, borderColor: s.kanban, color: 'white' } : {}}
           >
             {s.label}
           </button>
@@ -49,6 +47,42 @@ function InfoRow({ icon: Icon, label, value }) {
         <p className="text-xs text-brand-text-muted leading-none mb-0.5">{label}</p>
         <p className="text-sm text-brand-text font-medium break-words">{value}</p>
       </div>
+    </div>
+  )
+}
+
+function ContactoCard({ c, index, total }) {
+  const emails = (c.emails || []).filter(Boolean)
+  if (!c.nombre && !c.telefono && emails.length === 0) return null
+  return (
+    <div className="py-2 border-b border-brand-border last:border-0">
+      {total > 1 && (
+        <p className="text-xs font-semibold text-brand-text-muted mb-1.5">Contacto {index + 1}</p>
+      )}
+      {(c.nombre || c.puesto) && (
+        <div className="flex items-start gap-2.5 py-1.5">
+          <User size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            {c.nombre && <p className="text-sm text-brand-text font-medium leading-tight">{c.nombre}</p>}
+            {c.puesto && <p className="text-xs text-brand-text-muted mt-0.5">{c.puesto}</p>}
+          </div>
+        </div>
+      )}
+      {c.telefono && (
+        <div className="flex items-start gap-2.5 py-1.5">
+          <Phone size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-brand-text font-medium">{c.telefono}</p>
+        </div>
+      )}
+      {emails.map((e, ei) => (
+        <div key={ei} className="flex items-start gap-2.5 py-1.5">
+          <Mail size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            {emails.length > 1 && <p className="text-xs text-brand-text-muted leading-none mb-0.5">Email {ei + 1}</p>}
+            <p className="text-sm text-brand-text font-medium break-words">{e}</p>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -101,12 +135,8 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
         </div>
         {!editing && canDelete && (
           <div className="flex items-center gap-0.5 flex-shrink-0">
-            <button onClick={() => setEditing(true)} className="text-brand-text-muted hover:text-brand-text p-0.5" title="Editar">
-              <Edit2 size={13} />
-            </button>
-            <button onClick={() => onDelete(nota.id)} className="text-brand-text-muted hover:text-red-500 p-0.5" title="Eliminar">
-              <Trash2 size={13} />
-            </button>
+            <button onClick={() => setEditing(true)} className="text-brand-text-muted hover:text-brand-text p-0.5"><Edit2 size={13} /></button>
+            <button onClick={() => onDelete(nota.id)} className="text-brand-text-muted hover:text-red-500 p-0.5"><Trash2 size={13} /></button>
           </div>
         )}
       </div>
@@ -118,47 +148,11 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
   )
 }
 
-function ContactoCard({ c, index, total }) {
-  const emails = (c.emails || []).filter(Boolean)
-  if (!c.nombre && !c.telefono && emails.length === 0) return null
-  return (
-    <div className="py-2 border-b border-brand-border last:border-0">
-      {total > 1 && (
-        <p className="text-xs font-semibold text-brand-text-muted mb-1.5">Contacto {index + 1}</p>
-      )}
-      {(c.nombre || c.puesto) && (
-        <div className="flex items-start gap-2.5 py-1.5">
-          <User size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            {c.nombre && <p className="text-sm text-brand-text font-medium leading-tight">{c.nombre}</p>}
-            {c.puesto && <p className="text-xs text-brand-text-muted mt-0.5">{c.puesto}</p>}
-          </div>
-        </div>
-      )}
-      {c.telefono && (
-        <div className="flex items-start gap-2.5 py-1.5">
-          <Phone size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-brand-text font-medium">{c.telefono}</p>
-        </div>
-      )}
-      {emails.map((e, ei) => (
-        <div key={ei} className="flex items-start gap-2.5 py-1.5">
-          <Mail size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            {emails.length > 1 && <p className="text-xs text-brand-text-muted leading-none mb-0.5">Email {ei + 1}</p>}
-            <p className="text-sm text-brand-text font-medium break-words">{e}</p>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-export default function LeadDetail() {
+export default function ContactoDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { currentUser, userProfile } = useAuth()
-  const [lead, setLead] = useState(null)
+  const [contacto, setContacto] = useState(null)
   const [notas, setNotas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
@@ -167,14 +161,10 @@ export default function LeadDetail() {
   const [savingNota, setSavingNota] = useState(false)
 
   useEffect(() => {
-    getLead(id).then((data) => {
-      setLead(data)
-      setLoading(false)
-    })
+    getLead(id).then((data) => { setContacto(data); setLoading(false) })
   }, [id])
 
-  // Refrescar lead cuando cambia (después de editar)
-  const refreshLead = () => getLead(id).then(setLead)
+  const refreshContacto = () => getLead(id).then(setContacto)
 
   useEffect(() => {
     const unsub = subscribeNotas(id, setNotas)
@@ -182,33 +172,33 @@ export default function LeadDetail() {
   }, [id])
 
   const handleStageChange = async (newStage) => {
-    if (!lead) return
-    await updateLead(id, { estado: newStage })
-    setLead((l) => ({ ...l, estado: newStage }))
-    toast.success(`Estado actualizado a "${LEAD_STAGES[newStage]?.label}"`)
+    await updateLead(id, { estadoContacto: newStage })
+    setContacto((c) => ({ ...c, estadoContacto: newStage }))
+    toast.success(`Etapa: "${CONTACTO_STAGES[newStage]?.label}"`)
   }
 
-  const handleContactado = async () => {
-    await updateLead(id, { registroTipo: 'contacto', estadoContacto: 'contactado', esCliente: false })
-    toast.success('Movido a Contactos')
-    navigate('/crm/leads')
+  const handleGanado = async () => {
+    await updateLead(id, { registroTipo: 'cliente', estadoContacto: 'ganado' })
+    toast.success('¡Ganado! Movido a Clientes')
+    navigate('/crm/contactos')
   }
 
-  const handleNoContactado = async () => {
-    await updateLead(id, { contactado: false, estado: 'reintentar_contacto' })
-    setLead((l) => ({ ...l, contactado: false, estado: 'reintentar_contacto' }))
-    toast.success('Estado cambiado a "Reintentar contacto"')
-  }
-
-  const handleEditNota = async (notaId, texto) => {
-    await updateNota(id, notaId, texto)
+  const handlePerdido = async () => {
+    await updateLead(id, {
+      registroTipo: 'lead',
+      estado: 'reintentar_contacto',
+      estadoContacto: null,
+      esCliente: false,
+    })
+    toast.success('Volvió a Leads como "Reintentar contacto"')
+    navigate('/crm/contactos')
   }
 
   const handleDelete = async () => {
-    if (!window.confirm(`¿Eliminar el lead "${lead.nombre}"? Esta acción no se puede deshacer.`)) return
+    if (!window.confirm(`¿Eliminar "${contacto.nombre}"?`)) return
     await deleteLead(id)
-    toast.success('Lead eliminado')
-    navigate('/crm/leads')
+    toast.success('Eliminado')
+    navigate('/crm/contactos')
   }
 
   const handleAddNota = async (e) => {
@@ -219,72 +209,63 @@ export default function LeadDetail() {
       await addNota(id, notaTexto.trim(), notaTipo, currentUser)
       setNotaTexto('')
       setNotaTipo('nota')
-    } catch (err) {
-      toast.error('Error al guardar la nota')
-    } finally {
-      setSavingNota(false)
-    }
+    } catch { toast.error('Error al guardar la nota') }
+    finally { setSavingNota(false) }
   }
 
-  const handleDeleteNota = async (notaId) => {
-    await deleteNota(id, notaId)
-    toast.success('Nota eliminada')
-  }
+  const handleDeleteNota = async (notaId) => { await deleteNota(id, notaId); toast.success('Nota eliminada') }
+  const handleEditNota = async (notaId, texto) => { await updateNota(id, notaId, texto) }
 
   if (loading) return (
-    <div className="flex items-center justify-center h-full text-brand-text-muted text-sm">
-      Cargando...
-    </div>
+    <div className="flex items-center justify-center h-full text-brand-text-muted text-sm">Cargando...</div>
   )
-
-  if (!lead) return (
+  if (!contacto) return (
     <div className="flex flex-col items-center justify-center h-full gap-3">
-      <p className="text-brand-text-muted text-sm">Lead no encontrado</p>
-      <button onClick={() => navigate('/crm/leads')} className="btn-secondary text-xs">Volver</button>
+      <p className="text-brand-text-muted text-sm">Contacto no encontrado</p>
+      <button onClick={() => navigate('/crm/contactos')} className="btn-secondary text-xs">Volver</button>
     </div>
   )
 
-  const contactosList = lead.contactos?.length > 0
-    ? lead.contactos
-    : (lead.personaContacto || lead.telefono || lead.email)
-      ? [{ nombre: lead.personaContacto, puesto: lead.puesto, telefono: lead.telefono, emails: lead.email ? [lead.email] : [] }]
-      : []
+  const currentStage = contacto.estadoContacto || 'contactado'
+  const stage = CONTACTO_STAGES[currentStage] || CONTACTO_STAGES.contactado
+  const isTerminal = ['ganado', 'perdido'].includes(currentStage)
 
-  const stage = LEAD_STAGES[lead.estado] || LEAD_STAGES.lead_nuevo
-  const isSpecialStage = ['no_contactado', 'reintentar_contacto'].includes(lead.estado)
+  const contactosList = contacto.contactos?.length > 0
+    ? contacto.contactos
+    : (contacto.personaContacto || contacto.telefono || contacto.email)
+      ? [{ nombre: contacto.personaContacto, puesto: contacto.puesto, telefono: contacto.telefono, emails: contacto.email ? [contacto.email] : [] }]
+      : []
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Main panel */}
+      {/* Panel principal */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top bar */}
         <div className="px-5 py-3 border-b border-brand-border bg-white flex items-center gap-3">
-          <button onClick={() => navigate('/crm/leads')} className="btn-ghost p-1.5">
+          <button onClick={() => navigate('/crm/contactos')} className="btn-ghost p-1.5">
             <ArrowLeft size={16} />
           </button>
-          <h1 className="text-base font-bold text-brand-text flex-1 truncate">{lead.nombre}</h1>
+          <h1 className="text-base font-bold text-brand-text flex-1 truncate">{contacto.nombre}</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleContactado}
+              onClick={handleGanado}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                lead.contactado
+                currentStage === 'ganado'
                   ? 'bg-green-500 text-white border-green-500'
                   : 'bg-white text-green-700 border-green-200 hover:bg-green-50'
               }`}
             >
-              <CheckCircle size={13} />
-              Contactado
+              <CheckCircle size={13} /> Ganado
             </button>
             <button
-              onClick={handleNoContactado}
+              onClick={handlePerdido}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                lead.estado === 'reintentar_contacto'
+                currentStage === 'perdido'
                   ? 'bg-red-500 text-white border-red-500'
                   : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
               }`}
             >
-              <XCircle size={13} />
-              No contactado
+              <XCircle size={13} /> Perdido
             </button>
             <button onClick={() => setShowEdit(true)} className="btn-ghost p-1.5" title="Editar">
               <Edit2 size={15} />
@@ -297,22 +278,24 @@ export default function LeadDetail() {
 
         {/* Pipeline */}
         <div className="px-5 py-3 border-b border-brand-border bg-white">
-          <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-2">Etapas del lead</p>
-          {isSpecialStage ? (
+          <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-2">
+            Etapas de la oportunidad de venta
+          </p>
+          {isTerminal ? (
             <div className="flex items-center gap-2">
               <span className={`badge border text-xs ${stage.color}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
                 {stage.label}
               </span>
               <button
-                onClick={() => handleStageChange('lead_nuevo')}
+                onClick={() => handleStageChange('contactado')}
                 className="text-xs text-brand-text-muted hover:text-brand-text underline"
               >
-                Cambiar etapa
+                Reabrir
               </button>
             </div>
           ) : (
-            <PipelineBar current={lead.estado} onChange={handleStageChange} />
+            <PipelineBar current={currentStage} onChange={handleStageChange} />
           )}
         </div>
 
@@ -321,12 +304,9 @@ export default function LeadDetail() {
           <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-3">
             Emails y actividades
           </p>
-
           <div className="space-y-2 mb-4">
             {notas.length === 0 && (
-              <p className="text-xs text-brand-text-muted py-4 text-center">
-                No hay notas todavía
-              </p>
+              <p className="text-xs text-brand-text-muted py-4 text-center">No hay notas todavía</p>
             )}
             {notas.map((nota) => (
               <NotaItem
@@ -338,8 +318,6 @@ export default function LeadDetail() {
               />
             ))}
           </div>
-
-          {/* Input nueva nota */}
           <form onSubmit={handleAddNota} className="border border-brand-border rounded-xl bg-white overflow-hidden">
             <textarea
               className="w-full px-3 py-2.5 text-sm text-brand-text resize-none outline-none placeholder:text-brand-text-light"
@@ -352,23 +330,12 @@ export default function LeadDetail() {
               <div className="flex items-center gap-2">
                 {Object.entries(NOTE_TYPES).map(([k, v]) => (
                   <label key={k} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="tipo"
-                      value={k}
-                      checked={notaTipo === k}
-                      onChange={() => setNotaTipo(k)}
-                      className="accent-brand-orange"
-                    />
+                    <input type="radio" name="tipo" value={k} checked={notaTipo === k} onChange={() => setNotaTipo(k)} className="accent-brand-orange" />
                     <span className="text-xs text-brand-text-muted">{v.label}</span>
                   </label>
                 ))}
               </div>
-              <button
-                type="submit"
-                disabled={savingNota || !notaTexto.trim()}
-                className="btn-primary py-1 px-3 text-xs"
-              >
+              <button type="submit" disabled={savingNota || !notaTexto.trim()} className="btn-primary py-1 px-3 text-xs">
                 <Send size={12} />
                 {savingNota ? 'Guardando...' : 'Guardar'}
               </button>
@@ -377,15 +344,14 @@ export default function LeadDetail() {
         </div>
       </div>
 
-      {/* Right panel - Información del lead */}
+      {/* Panel derecho */}
       <div className="w-72 flex-shrink-0 border-l border-brand-border bg-white overflow-y-auto">
         <div className="px-4 py-3 border-b border-brand-border">
-          <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">
-            Información del lead
-          </p>
+          <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Información</p>
         </div>
         <div className="px-4 py-2">
-          <InfoRow icon={User} label="Nombre" value={lead.nombre} />
+          <InfoRow icon={User} label="Nombre" value={contacto.nombre} />
+
           <div className="py-2 border-b border-brand-border">
             <p className="text-xs text-brand-text-muted mb-1">Estado</p>
             <span className={`badge border text-xs ${stage.color}`}>
@@ -393,34 +359,59 @@ export default function LeadDetail() {
               {stage.label}
             </span>
           </div>
-          {lead.tipoCliente && (
+
+          {contacto.tipoCliente && (
             <div className="py-2 border-b border-brand-border">
               <p className="text-xs text-brand-text-muted mb-1">Tipo de cliente</p>
-              <span className="text-sm font-medium text-brand-text">{lead.tipoCliente}</span>
-            </div>
-          )}
-          {lead.producto && (
-            <div className="py-2 border-b border-brand-border">
-              <p className="text-xs text-brand-text-muted mb-1">Producto</p>
-              <span className={`badge text-xs ${lead.producto === 'Pastas Pariggi' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-orange-50 text-brand-orange border border-orange-200'}`}>
-                {lead.producto}
+              <span
+                className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
+                style={{ backgroundColor: TIPO_CLIENTE_COLORS[contacto.tipoCliente] || '#94A3B8' }}
+              >
+                {contacto.tipoCliente}
               </span>
             </div>
           )}
+
+          {contacto.producto && (
+            <div className="py-2 border-b border-brand-border">
+              <p className="text-xs text-brand-text-muted mb-1">Producto</p>
+              <span className={`badge text-xs ${contacto.producto === 'Pastas Pariggi' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-orange-50 text-brand-orange border border-orange-200'}`}>
+                {contacto.producto}
+              </span>
+            </div>
+          )}
+
+          {contacto.kilosMensuales && (
+            <div className="py-2 border-b border-brand-border">
+              <p className="text-xs text-brand-text-muted mb-1">Kilos mensuales</p>
+              <p className="text-sm font-medium text-brand-text">{contacto.kilosMensuales} kg</p>
+            </div>
+          )}
+
+          {contacto.fechaCierre && (
+            <div className="py-2 border-b border-brand-border">
+              <p className="text-xs text-brand-text-muted mb-1">Fecha estimada de cierre</p>
+              <p className="text-sm font-medium text-brand-text">{new Date(contacto.fechaCierre + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>
+            </div>
+          )}
+
           {contactosList.map((c, i) => (
             <ContactoCard key={i} c={c} index={i} total={contactosList.length} />
           ))}
-          <InfoRow icon={MapPin} label="Ubicación" value={lead.ubicacion} />
-          {lead.responsable && (
+
+          <InfoRow icon={MapPin} label="Ubicación" value={contacto.ubicacion} />
+
+          {contacto.responsable && (
             <div className="py-2 border-b border-brand-border">
               <p className="text-xs text-brand-text-muted mb-1">Responsable</p>
-              <span className="text-sm font-medium text-brand-text">{lead.responsable}</span>
+              <span className="text-sm font-medium text-brand-text">{contacto.responsable}</span>
             </div>
           )}
-          {lead.origenContacto && (
-            <div className="py-2 border-b border-brand-border">
+
+          {contacto.origenContacto && (
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Origen del contacto</p>
-              <span className="text-sm font-medium text-brand-text">{lead.origenContacto}</span>
+              <span className="text-sm font-medium text-brand-text">{contacto.origenContacto}</span>
             </div>
           )}
         </div>
@@ -428,9 +419,10 @@ export default function LeadDetail() {
 
       {showEdit && (
         <LeadForm
-          lead={lead}
+          lead={contacto}
           companyId={userProfile?.companyId}
-          onClose={() => { setShowEdit(false); refreshLead() }}
+          showContactoFields
+          onClose={() => { setShowEdit(false); refreshContacto() }}
         />
       )}
     </div>

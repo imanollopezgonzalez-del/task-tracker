@@ -117,7 +117,7 @@ export default function Leads() {
 
   const filtered = useMemo(() => {
     return leads.filter((l) => {
-      if (l.esCliente) return false
+      if (l.esCliente || (l.registroTipo && l.registroTipo !== 'lead')) return false
       const primerContacto = l.contactos?.[0]
       const nombreContacto = primerContacto?.nombre || l.personaContacto || ''
       const emailContacto = primerContacto?.emails?.[0] || l.email || ''
