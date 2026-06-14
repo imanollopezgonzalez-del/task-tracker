@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, LayoutGrid, List } from 'lucide-react'
+import { Search, LayoutGrid, List, ChevronUp, ChevronDown } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { subscribeLeads } from '../../services/leads'
+import { subscribeLeads, updateLead } from '../../services/leads'
 import {
   CONTACTO_STAGES, TIPOS_CLIENTE, PRODUCTOS, RESPONSABLES, TIPO_CLIENTE_COLORS,
 } from '../../utils/crmConstants'
+import toast from 'react-hot-toast'
 
 const ALL_STAGES = Object.keys(CONTACTO_STAGES)
 
@@ -30,13 +31,15 @@ function ProductoBadge({ producto }) {
   )
 }
 
-// ── Kanban ───────────────────────────────────────────────────────────────────
+// ── Kanban ────────────────────────────────────────────────────────────────────
 
 function KanbanCard({ c, onClick }) {
   return (
     <div
+      draggable
+      onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData('text/plain', c.id) }}
       onClick={onClick}
-      className="bg-white rounded-xl border border-brand-border p-3 cursor-pointer hover:shadow-md hover:border-brand-orange/40 transition-all"
+      className="bg-white rounded-xl border border-brand-border p-3 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-orange/40 transition-all"
     >
       <h4 className="text-sm font-semibold text-brand-text mb-2 leading-tight">{c.nombre}</h4>
       <div className="flex flex-wrap gap-1 mb-1.5">
@@ -50,19 +53,29 @@ function KanbanCard({ c, onClick }) {
   )
 }
 
-function KanbanColumn({ stageKey, contactos, onCardClick }) {
+function KanbanColumn({ stageKey, contactos, onCardClick, onDrop }) {
   const stage = CONTACTO_STAGES[stageKey]
+  const [dragOver, setDragOver] = useState(false)
+
   return (
     <div className="flex-shrink-0 w-52">
+      {/* Column header */}
       <div
-        className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg"
-        style={{ backgroundColor: stage.kanban + '22' }}
+        className="flex items-center gap-2 px-2 py-1.5 rounded-t-lg"
+        style={{ backgroundColor: stage.kanban + '40' }}
       >
         <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: stage.kanban }} />
         <span className="text-xs font-semibold text-brand-text truncate flex-1">{stage.label}</span>
         <span className="text-xs text-brand-text-muted font-medium">{contactos.length}</span>
       </div>
-      <div className="space-y-2 min-h-[32px]">
+      {/* Drop zone with light background */}
+      <div
+        className="min-h-[80px] rounded-b-lg p-2 space-y-2 transition-colors"
+        style={{ backgroundColor: dragOver ? (stage.kanban + '28') : (stage.kanban + '12') }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false) }}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); onDrop(e, stageKey) }}
+      >
         {contactos.map((c) => (
           <KanbanCard key={c.id} c={c} onClick={() => onCardClick(c.id)} />
         ))}
@@ -71,7 +84,27 @@ function KanbanColumn({ stageKey, contactos, onCardClick }) {
   )
 }
 
-// ── Tabla ────────────────────────────────────────────────────────────────────
+// ── Sortable table header ──────────────────────────────────────────────────────
+
+function SortableTh({ label, sk, sortKey, sortDir, onSort }) {
+  const active = sortKey === sk
+  return (
+    <th
+      className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide cursor-pointer select-none hover:text-brand-text"
+      onClick={() => onSort(sk)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {active
+          ? sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+          : <ChevronDown size={12} className="opacity-30" />
+        }
+      </span>
+    </th>
+  )
+}
+
+// ── Table ─────────────────────────────────────────────────────────────────────
 
 function TableRow({ c, onClick }) {
   const stage = CONTACTO_STAGES[c.estadoContacto] || CONTACTO_STAGES.contactado
@@ -93,9 +126,7 @@ function TableRow({ c, onClick }) {
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">
         {c.kilosMensuales ? `${c.kilosMensuales} kg` : '—'}
       </td>
-      <td className="py-2.5 px-4 text-xs text-brand-text-muted">
-        {c.fechaCierre || '—'}
-      </td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.fechaCierre || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">
         {primerContacto?.nombre || c.personaContacto || '—'}
       </td>
@@ -107,7 +138,7 @@ function TableRow({ c, onClick }) {
   )
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function Contactos() {
   const { userProfile } = useAuth()
@@ -118,6 +149,8 @@ export default function Contactos() {
   const [filterTipo, setFilterTipo] = useState('')
   const [filterProducto, setFilterProducto] = useState('')
   const [filterResponsable, setFilterResponsable] = useState('')
+  const [sortKey, setSortKey] = useState('')
+  const [sortDir, setSortDir] = useState('asc')
 
   useEffect(() => {
     if (!userProfile?.companyId) return
@@ -139,6 +172,28 @@ export default function Contactos() {
     })
   }, [leads, search, filterTipo, filterProducto, filterResponsable])
 
+  const sorted = useMemo(() => {
+    if (!sortKey) return contactos
+    return [...contactos].sort((a, b) => {
+      let va = sortKey === 'contacto'
+        ? (a.contactos?.[0]?.nombre || a.personaContacto || '')
+        : (a[sortKey] || '')
+      let vb = sortKey === 'contacto'
+        ? (b.contactos?.[0]?.nombre || b.personaContacto || '')
+        : (b[sortKey] || '')
+      if (typeof va === 'string') va = va.toLowerCase()
+      if (typeof vb === 'string') vb = vb.toLowerCase()
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [contactos, sortKey, sortDir])
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
   const kanbanGroups = useMemo(() => {
     const map = {}
     ALL_STAGES.forEach((k) => { map[k] = [] })
@@ -151,6 +206,17 @@ export default function Contactos() {
   }, [contactos])
 
   const goDetail = (id) => navigate(`/crm/contactos/${id}`)
+
+  const handleDrop = async (e, targetStage) => {
+    const cardId = e.dataTransfer.getData('text/plain')
+    if (!cardId) return
+    const card = contactos.find((c) => c.id === cardId)
+    if (!card || card.estadoContacto === targetStage) return
+    await updateLead(cardId, { estadoContacto: targetStage })
+    toast.success(`Movido a "${CONTACTO_STAGES[targetStage]?.label}"`)
+  }
+
+  const sortProps = { sortKey, sortDir, onSort: handleSort }
 
   return (
     <div className="flex flex-col h-full">
@@ -220,6 +286,7 @@ export default function Contactos() {
                   stageKey={key}
                   contactos={kanbanGroups[key] || []}
                   onCardClick={goDetail}
+                  onDrop={handleDrop}
                 />
               ))}
             </div>
@@ -240,13 +307,19 @@ export default function Contactos() {
               <table className="w-full min-w-[960px]">
                 <thead>
                   <tr className="border-b border-brand-border">
-                    {['Empresa','Estado','Tipo','Producto','Kg / mes','Fecha cierre','Contacto','Teléfono','Responsable'].map((h) => (
-                      <th key={h} className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">{h}</th>
-                    ))}
+                    <SortableTh label="Empresa" sk="nombre" {...sortProps} />
+                    <SortableTh label="Estado" sk="estadoContacto" {...sortProps} />
+                    <SortableTh label="Tipo" sk="tipoCliente" {...sortProps} />
+                    <SortableTh label="Producto" sk="producto" {...sortProps} />
+                    <SortableTh label="Kg / mes" sk="kilosMensuales" {...sortProps} />
+                    <SortableTh label="Fecha cierre" sk="fechaCierre" {...sortProps} />
+                    <SortableTh label="Contacto" sk="contacto" {...sortProps} />
+                    <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Teléfono</th>
+                    <SortableTh label="Responsable" sk="responsable" {...sortProps} />
                   </tr>
                 </thead>
                 <tbody>
-                  {contactos.map((c) => (
+                  {sorted.map((c) => (
                     <TableRow key={c.id} c={c} onClick={() => goDetail(c.id)} />
                   ))}
                 </tbody>

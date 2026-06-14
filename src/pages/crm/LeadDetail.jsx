@@ -1,22 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Phone, Mail, MapPin, User, Edit2, Trash2,
-  CheckCircle, XCircle, StickyNote, AlertCircle, Send,
+  ArrowLeft, Edit2, Trash2, CheckCircle, XCircle,
+  StickyNote, AlertCircle, Send, Phone, Mail, User,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
-import { LEAD_STAGES, PIPELINE_STEPS, TIPOS_CLIENTE, NOTE_TYPES } from '../../utils/crmConstants'
+import {
+  LEAD_STAGES, PIPELINE_STEPS, TIPOS_CLIENTE, PRODUCTOS,
+  ORIGENES_CONTACTO, RESPONSABLES, NOTE_TYPES,
+} from '../../utils/crmConstants'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
 
-function PipelineBar({ current, onChange }) {
-  const steps = PIPELINE_STEPS.filter((s) => !['no_contactado', 'reintentar_contacto'].includes(s))
-  const currentIdx = steps.indexOf(current)
+// ── Pipeline ──────────────────────────────────────────────────────────────────
 
+function PipelineBar({ current, onChange }) {
+  const currentIdx = PIPELINE_STEPS.indexOf(current)
   return (
-    <div className="flex items-center gap-0 overflow-x-auto pb-1">
-      {steps.map((step, i) => {
+    <div className="flex items-stretch">
+      {PIPELINE_STEPS.map((step, i) => {
         const s = LEAD_STAGES[step]
         const isActive = step === current
         const isPast = i < currentIdx
@@ -25,8 +28,8 @@ function PipelineBar({ current, onChange }) {
             key={step}
             onClick={() => onChange(step)}
             className={`
-              flex-1 min-w-[80px] px-3 py-1.5 text-xs font-medium border-y border-r first:border-l first:rounded-l-lg last:rounded-r-lg
-              transition-colors
+              flex-1 px-2 py-1.5 text-xs font-medium border-y border-r
+              first:border-l first:rounded-l-lg last:rounded-r-lg transition-colors truncate
               ${isActive ? 'bg-brand-orange text-white border-brand-orange' : ''}
               ${isPast ? 'bg-green-500 text-white border-green-500' : ''}
               ${!isActive && !isPast ? 'bg-white text-brand-text-muted border-brand-border hover:bg-brand-bg-2' : ''}
@@ -40,18 +43,82 @@ function PipelineBar({ current, onChange }) {
   )
 }
 
-function InfoRow({ icon: Icon, label, value }) {
-  if (!value) return null
+// ── Inline editing ─────────────────────────────────────────────────────────────
+
+function InlineText({ value, onChange, placeholder = '—' }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value || '')
+
+  const commit = () => {
+    setEditing(false)
+    const trimmed = draft.trim()
+    if (trimmed !== (value || '').trim()) onChange(trimmed)
+  }
+
+  if (editing) {
+    return (
+      <input
+        className="w-full text-sm text-brand-text border border-brand-border rounded px-2 py-0.5 outline-none focus:border-brand-orange bg-white"
+        value={draft}
+        autoFocus
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.target.blur()
+          if (e.key === 'Escape') { setDraft(value || ''); setEditing(false) }
+        }}
+      />
+    )
+  }
+
   return (
-    <div className="flex items-start gap-2.5 py-2 border-b border-brand-border last:border-0">
-      <Icon size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-brand-text-muted leading-none mb-0.5">{label}</p>
-        <p className="text-sm text-brand-text font-medium break-words">{value}</p>
-      </div>
+    <p
+      className={`text-sm font-medium cursor-pointer hover:bg-brand-bg-2 rounded px-1 -mx-1 py-0.5 ${value ? 'text-brand-text' : 'text-brand-text-light italic'}`}
+      onClick={() => { setDraft(value || ''); setEditing(true) }}
+      title="Click para editar"
+    >
+      {value || placeholder}
+    </p>
+  )
+}
+
+function InlineSelect({ value, options, onChange, placeholder = '—', renderValue }) {
+  const [editing, setEditing] = useState(false)
+
+  if (editing) {
+    return (
+      <select
+        className="w-full text-sm border border-brand-border rounded px-2 py-1 outline-none focus:border-brand-orange bg-white"
+        value={value || ''}
+        autoFocus
+        onChange={(e) => { onChange(e.target.value); setEditing(false) }}
+        onBlur={() => setEditing(false)}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) =>
+          typeof o === 'string'
+            ? <option key={o} value={o}>{o}</option>
+            : <option key={o.key} value={o.key}>{o.label}</option>
+        )}
+      </select>
+    )
+  }
+
+  return (
+    <div
+      className="cursor-pointer hover:bg-brand-bg-2 rounded px-1 -mx-1 py-0.5 min-h-[24px]"
+      onClick={() => setEditing(true)}
+      title="Click para editar"
+    >
+      {renderValue
+        ? renderValue(value)
+        : <p className={`text-sm font-medium ${value ? 'text-brand-text' : 'text-brand-text-light italic'}`}>{value || placeholder}</p>
+      }
     </div>
   )
 }
+
+// ── Notes ──────────────────────────────────────────────────────────────────────
 
 function NotaItem({ nota, onDelete, onEdit, canDelete }) {
   const [editing, setEditing] = useState(false)
@@ -118,32 +185,34 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
   )
 }
 
+// ── Contacts view (read-only, edit via modal) ──────────────────────────────────
+
 function ContactoCard({ c, index, total }) {
   const emails = (c.emails || []).filter(Boolean)
   if (!c.nombre && !c.telefono && emails.length === 0) return null
   return (
-    <div className="py-2 border-b border-brand-border last:border-0">
+    <div className="py-1.5 border-b border-brand-border last:border-0">
       {total > 1 && (
-        <p className="text-xs font-semibold text-brand-text-muted mb-1.5">Contacto {index + 1}</p>
+        <p className="text-xs font-semibold text-brand-text-muted mb-1">Contacto {index + 1}</p>
       )}
       {(c.nombre || c.puesto) && (
-        <div className="flex items-start gap-2.5 py-1.5">
-          <User size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-2 py-0.5">
+          <User size={13} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
           <div className="min-w-0 flex-1">
             {c.nombre && <p className="text-sm text-brand-text font-medium leading-tight">{c.nombre}</p>}
-            {c.puesto && <p className="text-xs text-brand-text-muted mt-0.5">{c.puesto}</p>}
+            {c.puesto && <p className="text-xs text-brand-text-muted">{c.puesto}</p>}
           </div>
         </div>
       )}
       {c.telefono && (
-        <div className="flex items-start gap-2.5 py-1.5">
-          <Phone size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-2 py-0.5">
+          <Phone size={13} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
           <p className="text-sm text-brand-text font-medium">{c.telefono}</p>
         </div>
       )}
       {emails.map((e, ei) => (
-        <div key={ei} className="flex items-start gap-2.5 py-1.5">
-          <Mail size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+        <div key={ei} className="flex items-start gap-2 py-0.5">
+          <Mail size={13} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
           <div className="min-w-0 flex-1">
             {emails.length > 1 && <p className="text-xs text-brand-text-muted leading-none mb-0.5">Email {ei + 1}</p>}
             <p className="text-sm text-brand-text font-medium break-words">{e}</p>
@@ -153,6 +222,8 @@ function ContactoCard({ c, index, total }) {
     </div>
   )
 }
+
+// ── Main ───────────────────────────────────────────────────────────────────────
 
 export default function LeadDetail() {
   const { id } = useParams()
@@ -167,13 +238,9 @@ export default function LeadDetail() {
   const [savingNota, setSavingNota] = useState(false)
 
   useEffect(() => {
-    getLead(id).then((data) => {
-      setLead(data)
-      setLoading(false)
-    })
+    getLead(id).then((data) => { setLead(data); setLoading(false) })
   }, [id])
 
-  // Refrescar lead cuando cambia (después de editar)
   const refreshLead = () => getLead(id).then(setLead)
 
   useEffect(() => {
@@ -182,10 +249,14 @@ export default function LeadDetail() {
   }, [id])
 
   const handleStageChange = async (newStage) => {
-    if (!lead) return
     await updateLead(id, { estado: newStage })
     setLead((l) => ({ ...l, estado: newStage }))
-    toast.success(`Estado actualizado a "${LEAD_STAGES[newStage]?.label}"`)
+    toast.success(`Estado: "${LEAD_STAGES[newStage]?.label}"`)
+  }
+
+  const handleSave = async (field, value) => {
+    await updateLead(id, { [field]: value })
+    setLead((l) => ({ ...l, [field]: value }))
   }
 
   const handleContactado = async () => {
@@ -197,15 +268,11 @@ export default function LeadDetail() {
   const handleNoContactado = async () => {
     await updateLead(id, { contactado: false, estado: 'reintentar_contacto' })
     setLead((l) => ({ ...l, contactado: false, estado: 'reintentar_contacto' }))
-    toast.success('Estado cambiado a "Reintentar contacto"')
-  }
-
-  const handleEditNota = async (notaId, texto) => {
-    await updateNota(id, notaId, texto)
+    toast.success('Estado: "Reintentar contacto"')
   }
 
   const handleDelete = async () => {
-    if (!window.confirm(`¿Eliminar el lead "${lead.nombre}"? Esta acción no se puede deshacer.`)) return
+    if (!window.confirm(`¿Eliminar el lead "${lead?.nombre}"?`)) return
     await deleteLead(id)
     toast.success('Lead eliminado')
     navigate('/crm/leads')
@@ -219,24 +286,19 @@ export default function LeadDetail() {
       await addNota(id, notaTexto.trim(), notaTipo, currentUser)
       setNotaTexto('')
       setNotaTipo('nota')
-    } catch (err) {
+    } catch {
       toast.error('Error al guardar la nota')
     } finally {
       setSavingNota(false)
     }
   }
 
-  const handleDeleteNota = async (notaId) => {
-    await deleteNota(id, notaId)
-    toast.success('Nota eliminada')
-  }
+  const handleDeleteNota = async (notaId) => { await deleteNota(id, notaId); toast.success('Nota eliminada') }
+  const handleEditNota = async (notaId, texto) => { await updateNota(id, notaId, texto) }
 
   if (loading) return (
-    <div className="flex items-center justify-center h-full text-brand-text-muted text-sm">
-      Cargando...
-    </div>
+    <div className="flex items-center justify-center h-full text-brand-text-muted text-sm">Cargando...</div>
   )
-
   if (!lead) return (
     <div className="flex flex-col items-center justify-center h-full gap-3">
       <p className="text-brand-text-muted text-sm">Lead no encontrado</p>
@@ -252,81 +314,62 @@ export default function LeadDetail() {
 
   const stage = LEAD_STAGES[lead.estado] || LEAD_STAGES.lead_nuevo
   const isSpecialStage = ['no_contactado', 'reintentar_contacto'].includes(lead.estado)
+  const stageOptions = Object.entries(LEAD_STAGES).map(([k, v]) => ({ key: k, label: v.label }))
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Main panel */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div className="px-5 py-3 border-b border-brand-border bg-white flex items-center gap-3">
-          <button onClick={() => navigate('/crm/leads')} className="btn-ghost p-1.5">
-            <ArrowLeft size={16} />
-          </button>
-          <h1 className="text-base font-bold text-brand-text flex-1 truncate">{lead.nombre}</h1>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Top bar */}
+      <div className="px-5 py-3 border-b border-brand-border bg-white flex items-center gap-3 flex-shrink-0">
+        <button onClick={() => navigate('/crm/leads')} className="btn-ghost p-1.5">
+          <ArrowLeft size={16} />
+        </button>
+        <h1 className="text-base font-bold text-brand-text flex-1 truncate">{lead.nombre}</h1>
+        <button
+          onClick={handleContactado}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors bg-white text-green-700 border-green-200 hover:bg-green-50"
+        >
+          <CheckCircle size={13} /> Contactado
+        </button>
+        <button
+          onClick={handleNoContactado}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+            lead.estado === 'reintentar_contacto'
+              ? 'bg-red-500 text-white border-red-500'
+              : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
+          }`}
+        >
+          <XCircle size={13} /> No contactado
+        </button>
+      </div>
+
+      {/* Pipeline — full width */}
+      <div className="px-5 py-3 border-b border-brand-border bg-white flex-shrink-0">
+        <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-2">Etapas del lead</p>
+        {isSpecialStage ? (
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleContactado}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                lead.contactado
-                  ? 'bg-green-500 text-white border-green-500'
-                  : 'bg-white text-green-700 border-green-200 hover:bg-green-50'
-              }`}
-            >
-              <CheckCircle size={13} />
-              Contactado
-            </button>
-            <button
-              onClick={handleNoContactado}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                lead.estado === 'reintentar_contacto'
-                  ? 'bg-red-500 text-white border-red-500'
-                  : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
-              }`}
-            >
-              <XCircle size={13} />
-              No contactado
-            </button>
-            <button onClick={() => setShowEdit(true)} className="btn-ghost p-1.5" title="Editar">
-              <Edit2 size={15} />
-            </button>
-            <button onClick={handleDelete} className="btn-ghost p-1.5 text-red-500 hover:text-red-600 hover:bg-red-50" title="Eliminar">
-              <Trash2 size={15} />
+            <span className={`badge border text-xs ${stage.color}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
+              {stage.label}
+            </span>
+            <button onClick={() => handleStageChange('lead_nuevo')} className="text-xs text-brand-text-muted hover:text-brand-text underline">
+              Cambiar etapa
             </button>
           </div>
-        </div>
+        ) : (
+          <PipelineBar current={lead.estado} onChange={handleStageChange} />
+        )}
+      </div>
 
-        {/* Pipeline */}
-        <div className="px-5 py-3 border-b border-brand-border bg-white">
-          <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-2">Etapas del lead</p>
-          {isSpecialStage ? (
-            <div className="flex items-center gap-2">
-              <span className={`badge border text-xs ${stage.color}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
-                {stage.label}
-              </span>
-              <button
-                onClick={() => handleStageChange('lead_nuevo')}
-                className="text-xs text-brand-text-muted hover:text-brand-text underline"
-              >
-                Cambiar etapa
-              </button>
-            </div>
-          ) : (
-            <PipelineBar current={lead.estado} onChange={handleStageChange} />
-          )}
-        </div>
-
-        {/* Notas */}
+      {/* Body: notes + right panel start at same level */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Notes panel */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-3">
             Emails y actividades
           </p>
-
           <div className="space-y-2 mb-4">
             {notas.length === 0 && (
-              <p className="text-xs text-brand-text-muted py-4 text-center">
-                No hay notas todavía
-              </p>
+              <p className="text-xs text-brand-text-muted py-4 text-center">No hay notas todavía</p>
             )}
             {notas.map((nota) => (
               <NotaItem
@@ -338,8 +381,6 @@ export default function LeadDetail() {
               />
             ))}
           </div>
-
-          {/* Input nueva nota */}
           <form onSubmit={handleAddNota} className="border border-brand-border rounded-xl bg-white overflow-hidden">
             <textarea
               className="w-full px-3 py-2.5 text-sm text-brand-text resize-none outline-none placeholder:text-brand-text-light"
@@ -352,77 +393,114 @@ export default function LeadDetail() {
               <div className="flex items-center gap-2">
                 {Object.entries(NOTE_TYPES).map(([k, v]) => (
                   <label key={k} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="tipo"
-                      value={k}
-                      checked={notaTipo === k}
-                      onChange={() => setNotaTipo(k)}
-                      className="accent-brand-orange"
-                    />
+                    <input type="radio" name="tipo" value={k} checked={notaTipo === k} onChange={() => setNotaTipo(k)} className="accent-brand-orange" />
                     <span className="text-xs text-brand-text-muted">{v.label}</span>
                   </label>
                 ))}
               </div>
-              <button
-                type="submit"
-                disabled={savingNota || !notaTexto.trim()}
-                className="btn-primary py-1 px-3 text-xs"
-              >
-                <Send size={12} />
-                {savingNota ? 'Guardando...' : 'Guardar'}
+              <button type="submit" disabled={savingNota || !notaTexto.trim()} className="btn-primary py-1 px-3 text-xs">
+                <Send size={12} /> {savingNota ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
           </form>
         </div>
-      </div>
 
-      {/* Right panel - Información del lead */}
-      <div className="w-72 flex-shrink-0 border-l border-brand-border bg-white overflow-y-auto">
-        <div className="px-4 py-3 border-b border-brand-border">
-          <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">
-            Información del lead
-          </p>
-        </div>
-        <div className="px-4 py-2">
-          <InfoRow icon={User} label="Nombre" value={lead.nombre} />
-          <div className="py-2 border-b border-brand-border">
-            <p className="text-xs text-brand-text-muted mb-1">Estado</p>
-            <span className={`badge border text-xs ${stage.color}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
-              {stage.label}
-            </span>
+        {/* Right panel */}
+        <div className="w-72 flex-shrink-0 border-l border-brand-border bg-white overflow-y-auto">
+          <div className="px-4 py-3 border-b border-brand-border flex items-center justify-between">
+            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Información</p>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setShowEdit(true)} className="btn-ghost p-1" title="Editar contactos">
+                <Edit2 size={14} />
+              </button>
+              <button onClick={handleDelete} className="btn-ghost p-1 text-red-500 hover:text-red-600 hover:bg-red-50" title="Eliminar">
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
-          {lead.tipoCliente && (
-            <div className="py-2 border-b border-brand-border">
+
+          <div className="px-4 py-2 divide-y divide-brand-border">
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Nombre</p>
+              <InlineText value={lead.nombre} onChange={(v) => handleSave('nombre', v)} placeholder="Sin nombre" />
+            </div>
+
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Estado</p>
+              <InlineSelect
+                value={lead.estado}
+                options={stageOptions}
+                onChange={(v) => { handleSave('estado', v); if (['no_contactado', 'reintentar_contacto'].includes(v)) setLead((l) => ({ ...l, estado: v })) }}
+                placeholder="Sin estado"
+                renderValue={(v) => {
+                  const s = LEAD_STAGES[v] || LEAD_STAGES.lead_nuevo
+                  return (
+                    <span className={`badge border text-xs ${s.color}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      {s.label}
+                    </span>
+                  )
+                }}
+              />
+            </div>
+
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Tipo de cliente</p>
-              <span className="text-sm font-medium text-brand-text">{lead.tipoCliente}</span>
+              <InlineSelect
+                value={lead.tipoCliente}
+                options={TIPOS_CLIENTE}
+                onChange={(v) => handleSave('tipoCliente', v)}
+                placeholder="Sin tipo"
+              />
             </div>
-          )}
-          {lead.producto && (
-            <div className="py-2 border-b border-brand-border">
+
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Producto</p>
-              <span className={`badge text-xs ${lead.producto === 'Pastas Pariggi' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-orange-50 text-brand-orange border border-orange-200'}`}>
-                {lead.producto}
-              </span>
+              <InlineSelect
+                value={lead.producto}
+                options={PRODUCTOS}
+                onChange={(v) => handleSave('producto', v)}
+                placeholder="Sin producto"
+                renderValue={(v) => v
+                  ? <span className={`badge text-xs ${v === 'Pastas Pariggi' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' : 'bg-orange-50 text-brand-orange border border-orange-200'}`}>{v}</span>
+                  : <p className="text-sm text-brand-text-light italic">Sin producto</p>
+                }
+              />
             </div>
-          )}
-          {contactosList.map((c, i) => (
-            <ContactoCard key={i} c={c} index={i} total={contactosList.length} />
-          ))}
-          <InfoRow icon={MapPin} label="Ubicación" value={lead.ubicacion} />
-          {lead.responsable && (
-            <div className="py-2 border-b border-brand-border">
+
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1.5">Contactos</p>
+              {contactosList.length > 0
+                ? contactosList.map((c, i) => <ContactoCard key={i} c={c} index={i} total={contactosList.length} />)
+                : <p className="text-sm text-brand-text-light italic py-1">Sin contactos — usar ✏️ Editar</p>
+              }
+            </div>
+
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Ubicación</p>
+              <InlineText value={lead.ubicacion} onChange={(v) => handleSave('ubicacion', v)} placeholder="Sin ubicación" />
+            </div>
+
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Responsable</p>
-              <span className="text-sm font-medium text-brand-text">{lead.responsable}</span>
+              <InlineSelect
+                value={lead.responsable}
+                options={RESPONSABLES}
+                onChange={(v) => handleSave('responsable', v)}
+                placeholder="Sin responsable"
+              />
             </div>
-          )}
-          {lead.origenContacto && (
-            <div className="py-2 border-b border-brand-border">
+
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Origen del contacto</p>
-              <span className="text-sm font-medium text-brand-text">{lead.origenContacto}</span>
+              <InlineSelect
+                value={lead.origenContacto}
+                options={ORIGENES_CONTACTO}
+                onChange={(v) => handleSave('origenContacto', v)}
+                placeholder="Sin origen"
+              />
             </div>
-          )}
+          </div>
         </div>
       </div>
 

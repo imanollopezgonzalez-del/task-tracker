@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, ChevronDown, ChevronRight, Phone, Mail, MapPin, User } from 'lucide-react'
+import { Plus, Search, ChevronDown, ChevronRight, ChevronUp, Phone, User } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { subscribeLeads } from '../../services/leads'
 import { LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, GRUPOS_LISTA, ORIGENES_CONTACTO, RESPONSABLES } from '../../utils/crmConstants'
@@ -52,7 +52,25 @@ function LeadRow({ lead, onClick }) {
   )
 }
 
-function GroupSection({ grupo, leads, onLeadClick, defaultOpen = true }) {
+function SortableTh({ label, sk, sortKey, sortDir, onSort }) {
+  const active = sortKey === sk
+  return (
+    <th
+      className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide cursor-pointer select-none hover:text-brand-text"
+      onClick={() => onSort(sk)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {active
+          ? sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+          : <ChevronDown size={12} className="opacity-30" />
+        }
+      </span>
+    </th>
+  )
+}
+
+function GroupSection({ grupo, leads, onLeadClick, defaultOpen = true, sortKey, sortDir, onSort }) {
   const [open, setOpen] = useState(defaultOpen)
   const g = GRUPOS_LISTA.find((g) => g.key === grupo) || { label: grupo, color: '#94A3B8' }
 
@@ -62,10 +80,7 @@ function GroupSection({ grupo, leads, onLeadClick, defaultOpen = true }) {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 px-4 py-2 w-full text-left hover:bg-brand-bg-2 rounded-lg transition-colors"
       >
-        <span
-          className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
-          style={{ backgroundColor: g.color }}
-        />
+        <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: g.color }} />
         <span className="text-sm font-semibold text-brand-text">{g.label}</span>
         <span className="text-xs text-brand-text-muted ml-1">({leads.length})</span>
         <span className="ml-auto text-brand-text-muted">
@@ -78,13 +93,13 @@ function GroupSection({ grupo, leads, onLeadClick, defaultOpen = true }) {
           <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-brand-border">
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Nombre</th>
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Estado</th>
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Tipo</th>
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Producto</th>
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Contacto</th>
+                <SortableTh label="Nombre" sk="nombre" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortableTh label="Estado" sk="estado" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortableTh label="Tipo" sk="tipoCliente" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortableTh label="Producto" sk="producto" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+                <SortableTh label="Contacto" sk="contacto" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
                 <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Teléfono</th>
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Responsable</th>
+                <SortableTh label="Responsable" sk="responsable" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
               </tr>
             </thead>
             <tbody>
@@ -108,6 +123,8 @@ export default function Leads() {
   const [filterTipo, setFilterTipo] = useState('')
   const [filterProducto, setFilterProducto] = useState('')
   const [filterResponsable, setFilterResponsable] = useState('')
+  const [sortKey, setSortKey] = useState('')
+  const [sortDir, setSortDir] = useState('asc')
 
   useEffect(() => {
     if (!userProfile?.companyId) return
@@ -131,13 +148,35 @@ export default function Leads() {
     })
   }, [leads, search, filterTipo, filterProducto, filterResponsable])
 
+  const handleSort = (key) => {
+    if (sortKey === key) setSortDir((d) => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return filtered
+    return [...filtered].sort((a, b) => {
+      let va = sortKey === 'contacto'
+        ? (a.contactos?.[0]?.nombre || a.personaContacto || '')
+        : (a[sortKey] || '')
+      let vb = sortKey === 'contacto'
+        ? (b.contactos?.[0]?.nombre || b.personaContacto || '')
+        : (b[sortKey] || '')
+      if (typeof va === 'string') va = va.toLowerCase()
+      if (typeof vb === 'string') vb = vb.toLowerCase()
+      if (va < vb) return sortDir === 'asc' ? -1 : 1
+      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [filtered, sortKey, sortDir])
+
   // Grupos en el orden de GRUPOS_LISTA
   // Los "No contactados" y "Clientes a Recuperar" son grupos virtuales basados en estado
   const groupOrder = GRUPOS_LISTA.map((g) => g.key)
   const grouped = useMemo(() => {
     const map = {}
     groupOrder.forEach((k) => { map[k] = [] })
-    filtered.forEach((l) => {
+    sorted.forEach((l) => {
       // Leads con estado especial van a grupos virtuales
       if (l.estado === 'no_contactado') {
         map['No contactados'].push(l)
@@ -207,11 +246,14 @@ export default function Leads() {
               leads={groupLeads}
               onLeadClick={(id) => navigate(`/crm/leads/${id}`)}
               defaultOpen
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
             />
           )
         })}
 
-        {filtered.length === 0 && (
+        {sorted.length === 0 && (
           <div className="flex flex-col items-center justify-center py-16 text-brand-text-muted">
             <User size={40} className="mb-3 opacity-30" />
             <p className="text-sm font-medium">No hay leads</p>
