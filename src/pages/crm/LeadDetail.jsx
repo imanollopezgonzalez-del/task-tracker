@@ -118,6 +118,42 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
   )
 }
 
+function ContactoCard({ c, index, total }) {
+  const emails = (c.emails || []).filter(Boolean)
+  if (!c.nombre && !c.telefono && emails.length === 0) return null
+  return (
+    <div className="py-2 border-b border-brand-border last:border-0">
+      {total > 1 && (
+        <p className="text-xs font-semibold text-brand-text-muted mb-1.5">Contacto {index + 1}</p>
+      )}
+      {(c.nombre || c.puesto) && (
+        <div className="flex items-start gap-2.5 py-1.5">
+          <User size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            {c.nombre && <p className="text-sm text-brand-text font-medium leading-tight">{c.nombre}</p>}
+            {c.puesto && <p className="text-xs text-brand-text-muted mt-0.5">{c.puesto}</p>}
+          </div>
+        </div>
+      )}
+      {c.telefono && (
+        <div className="flex items-start gap-2.5 py-1.5">
+          <Phone size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-brand-text font-medium">{c.telefono}</p>
+        </div>
+      )}
+      {emails.map((e, ei) => (
+        <div key={ei} className="flex items-start gap-2.5 py-1.5">
+          <Mail size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
+          <div className="min-w-0 flex-1">
+            {emails.length > 1 && <p className="text-xs text-brand-text-muted leading-none mb-0.5">Email {ei + 1}</p>}
+            <p className="text-sm text-brand-text font-medium break-words">{e}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function LeadDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -153,9 +189,9 @@ export default function LeadDetail() {
   }
 
   const handleContactado = async () => {
-    await updateLead(id, { contactado: true })
-    setLead((l) => ({ ...l, contactado: true }))
-    toast.success('Lead marcado como contactado')
+    await updateLead(id, { contactado: true, esCliente: true })
+    toast.success('Movido a Clientes')
+    navigate('/crm/leads')
   }
 
   const handleNoContactado = async () => {
@@ -207,6 +243,12 @@ export default function LeadDetail() {
       <button onClick={() => navigate('/crm/leads')} className="btn-secondary text-xs">Volver</button>
     </div>
   )
+
+  const contactosList = lead.contactos?.length > 0
+    ? lead.contactos
+    : (lead.personaContacto || lead.telefono || lead.email)
+      ? [{ nombre: lead.personaContacto, puesto: lead.puesto, telefono: lead.telefono, emails: lead.email ? [lead.email] : [] }]
+      : []
 
   const stage = LEAD_STAGES[lead.estado] || LEAD_STAGES.lead_nuevo
   const isSpecialStage = ['no_contactado', 'reintentar_contacto'].includes(lead.estado)
@@ -365,15 +407,9 @@ export default function LeadDetail() {
               </span>
             </div>
           )}
-          <InfoRow icon={User} label="Persona de contacto" value={lead.personaContacto} />
-          {lead.puesto && (
-            <div className="py-2 border-b border-brand-border">
-              <p className="text-xs text-brand-text-muted mb-1">Puesto</p>
-              <span className="text-sm font-medium text-brand-text">{lead.puesto}</span>
-            </div>
-          )}
-          <InfoRow icon={Phone} label="Teléfono" value={lead.telefono} />
-          <InfoRow icon={Mail} label="E-mail" value={lead.email} />
+          {contactosList.map((c, i) => (
+            <ContactoCard key={i} c={c} index={i} total={contactosList.length} />
+          ))}
           <InfoRow icon={MapPin} label="Ubicación" value={lead.ubicacion} />
           {lead.responsable && (
             <div className="py-2 border-b border-brand-border">

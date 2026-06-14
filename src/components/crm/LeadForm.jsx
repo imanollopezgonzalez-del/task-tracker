@@ -8,16 +8,16 @@ import {
 } from '../../utils/crmConstants'
 import toast from 'react-hot-toast'
 
+const EMPTY_CONTACTO = { nombre: '', puesto: '', telefono: '', emails: [''] }
+
 const EMPTY = {
   nombre: '',
   estado: 'lead_nuevo',
   contactado: false,
+  esCliente: false,
   tipoCliente: '',
   producto: '',
-  personaContacto: '',
-  puesto: '',
-  telefono: '',
-  email: '',
+  contactos: [{ ...EMPTY_CONTACTO }],
   ubicacion: '',
   responsable: '',
   origenContacto: '',
@@ -33,12 +33,17 @@ export default function LeadForm({ lead, companyId, onClose }) {
           nombre: lead.nombre || '',
           estado: lead.estado || 'lead_nuevo',
           contactado: lead.contactado || false,
+          esCliente: lead.esCliente || false,
           tipoCliente: lead.tipoCliente || '',
           producto: lead.producto || '',
-          personaContacto: lead.personaContacto || '',
-          puesto: lead.puesto || '',
-          telefono: lead.telefono || '',
-          email: lead.email || '',
+          contactos: lead.contactos?.length > 0
+            ? lead.contactos
+            : [{
+                nombre: lead.personaContacto || '',
+                puesto: lead.puesto || '',
+                telefono: lead.telefono || '',
+                emails: lead.email ? [lead.email] : [''],
+              }],
           ubicacion: lead.ubicacion || '',
           responsable: lead.responsable || '',
           origenContacto: lead.origenContacto || '',
@@ -50,11 +55,35 @@ export default function LeadForm({ lead, companyId, onClose }) {
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
+  const addContacto = () => setForm((f) => ({
+    ...f, contactos: [...f.contactos, { ...EMPTY_CONTACTO, emails: [''] }],
+  }))
+  const removeContacto = (ci) => setForm((f) => ({
+    ...f, contactos: f.contactos.filter((_, i) => i !== ci),
+  }))
+  const setContacto = (ci, key, val) => setForm((f) => ({
+    ...f, contactos: f.contactos.map((c, i) => i === ci ? { ...c, [key]: val } : c),
+  }))
+  const addEmail = (ci) => setForm((f) => ({
+    ...f, contactos: f.contactos.map((c, i) =>
+      i === ci && c.emails.length < 5 ? { ...c, emails: [...c.emails, ''] } : c
+    ),
+  }))
+  const removeEmail = (ci, ei) => setForm((f) => ({
+    ...f, contactos: f.contactos.map((c, i) =>
+      i === ci ? { ...c, emails: c.emails.filter((_, j) => j !== ei) } : c
+    ),
+  }))
+  const setEmail = (ci, ei, val) => setForm((f) => ({
+    ...f, contactos: f.contactos.map((c, i) =>
+      i === ci ? { ...c, emails: c.emails.map((e, j) => j === ei ? val : e) } : c
+    ),
+  }))
+
   const handleGuardar = async () => {
     if (!form.nombre.trim()) return toast.error('El nombre es obligatorio')
     setSaving(true)
     try {
-      // grupo = origen del contacto (son lo mismo)
       const payload = { ...form, companyId, grupo: form.origenContacto }
       if (isEdit) {
         await updateLead(lead.id, payload)
@@ -138,46 +167,84 @@ export default function LeadForm({ lead, companyId, onClose }) {
             </div>
           </div>
 
-          {/* Persona de contacto + Puesto */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Persona de contacto</label>
-              <input
-                className="input-field"
-                value={form.personaContacto}
-                onChange={(e) => set('personaContacto', e.target.value)}
-                placeholder="Nombre del contacto"
-              />
+          {/* Personas de contacto */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="label mb-0">Personas de contacto</label>
+              <button type="button" onClick={addContacto} className="text-xs text-brand-orange hover:underline font-medium">
+                + Agregar persona
+              </button>
             </div>
-            <div>
-              <label className="label">Puesto</label>
-              <select className="select-field" value={form.puesto} onChange={(e) => set('puesto', e.target.value)}>
-                <option value="">— Seleccionar —</option>
-                {PUESTOS.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Teléfono + Email */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Teléfono</label>
-              <input
-                className="input-field"
-                value={form.telefono}
-                onChange={(e) => set('telefono', e.target.value)}
-                placeholder="+54 11 ..."
-              />
-            </div>
-            <div>
-              <label className="label">E-mail</label>
-              <input
-                className="input-field"
-                type="text"
-                value={form.email}
-                onChange={(e) => set('email', e.target.value)}
-                placeholder="contacto@empresa.com"
-              />
+            <div className="space-y-3">
+              {form.contactos.map((c, ci) => (
+                <div key={ci} className="border border-brand-border rounded-xl p-3 space-y-3 bg-brand-bg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">
+                      Contacto {ci + 1}
+                    </span>
+                    {form.contactos.length > 1 && (
+                      <button type="button" onClick={() => removeContacto(ci)} className="text-xs text-red-500 hover:underline">
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label">Nombre</label>
+                      <input
+                        className="input-field"
+                        value={c.nombre}
+                        onChange={(e) => setContacto(ci, 'nombre', e.target.value)}
+                        placeholder="Nombre del contacto"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Puesto</label>
+                      <select className="select-field" value={c.puesto} onChange={(e) => setContacto(ci, 'puesto', e.target.value)}>
+                        <option value="">— Seleccionar —</option>
+                        {PUESTOS.map((p) => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Teléfono</label>
+                    <input
+                      className="input-field"
+                      value={c.telefono}
+                      onChange={(e) => setContacto(ci, 'telefono', e.target.value)}
+                      placeholder="+54 11 ..."
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="label mb-0">Emails</label>
+                      {c.emails.length < 5 && (
+                        <button type="button" onClick={() => addEmail(ci)} className="text-xs text-brand-orange hover:underline font-medium">
+                          + Agregar email
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      {c.emails.map((email, ei) => (
+                        <div key={ei} className="flex items-center gap-2">
+                          <input
+                            className="input-field flex-1"
+                            type="text"
+                            value={email}
+                            onChange={(e) => setEmail(ci, ei, e.target.value)}
+                            placeholder={`Email ${ei + 1}`}
+                          />
+                          {c.emails.length > 1 && (
+                            <button type="button" onClick={() => removeEmail(ci, ei)} className="text-brand-text-muted hover:text-red-500 p-1">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

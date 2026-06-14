@@ -12,7 +12,7 @@ export const LEAD_STAGES = {
 }
 
 // Etapas del pipeline (barra de progreso)
-export const PIPELINE_STEPS = ['lead_nuevo', 'email', 'instagram', 'linkedin', 'whatsapp', 'llamada', 'closed']
+export const PIPELINE_STEPS = ['lead_nuevo', 'email', 'instagram', 'linkedin', 'whatsapp', 'llamada']
 
 export const TIPOS_CLIENTE = [
   'Distribuidor',

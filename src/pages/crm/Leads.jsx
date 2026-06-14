@@ -36,20 +36,15 @@ function LeadRow({ lead, onClick }) {
           </span>
         )}
       </td>
-      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{lead.personaContacto || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">
-        {lead.telefono && (
+        {lead.contactos?.[0]?.nombre || lead.personaContacto || '—'}
+      </td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">
+        {(lead.contactos?.[0]?.telefono || lead.telefono) && (
           <span className="flex items-center gap-1">
             <Phone size={11} />
-            {lead.telefono}
+            {lead.contactos?.[0]?.telefono || lead.telefono}
           </span>
-        )}
-      </td>
-      <td className="py-2.5 px-4">
-        {lead.contactado ? (
-          <span className="badge bg-green-50 text-green-700 border border-green-200 text-xs">Contactado</span>
-        ) : (
-          <span className="badge bg-red-50 text-red-500 border border-red-200 text-xs">No contactado</span>
         )}
       </td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{lead.responsable || '—'}</td>
@@ -89,7 +84,6 @@ function GroupSection({ grupo, leads, onLeadClick, defaultOpen = true }) {
                 <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Producto</th>
                 <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Contacto</th>
                 <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Teléfono</th>
-                <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Contactado</th>
                 <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Responsable</th>
               </tr>
             </thead>
@@ -114,7 +108,6 @@ export default function Leads() {
   const [filterTipo, setFilterTipo] = useState('')
   const [filterProducto, setFilterProducto] = useState('')
   const [filterResponsable, setFilterResponsable] = useState('')
-  const [filterContactado, setFilterContactado] = useState('')
 
   useEffect(() => {
     if (!userProfile?.companyId) return
@@ -124,17 +117,19 @@ export default function Leads() {
 
   const filtered = useMemo(() => {
     return leads.filter((l) => {
+      if (l.esCliente) return false
+      const primerContacto = l.contactos?.[0]
+      const nombreContacto = primerContacto?.nombre || l.personaContacto || ''
+      const emailContacto = primerContacto?.emails?.[0] || l.email || ''
       if (search && !l.nombre?.toLowerCase().includes(search.toLowerCase()) &&
-          !l.personaContacto?.toLowerCase().includes(search.toLowerCase()) &&
-          !l.email?.toLowerCase().includes(search.toLowerCase())) return false
+          !nombreContacto.toLowerCase().includes(search.toLowerCase()) &&
+          !emailContacto.toLowerCase().includes(search.toLowerCase())) return false
       if (filterTipo && l.tipoCliente !== filterTipo) return false
       if (filterProducto && l.producto !== filterProducto) return false
       if (filterResponsable && l.responsable !== filterResponsable) return false
-      if (filterContactado === 'si' && !l.contactado) return false
-      if (filterContactado === 'no' && l.contactado) return false
       return true
     })
-  }, [leads, search, filterTipo, filterProducto, filterResponsable, filterContactado])
+  }, [leads, search, filterTipo, filterProducto, filterResponsable])
 
   // Grupos en el orden de GRUPOS_LISTA
   // Los "No contactados" y "Clientes a Recuperar" son grupos virtuales basados en estado
@@ -196,11 +191,6 @@ export default function Leads() {
           <select className="select-field h-8 text-xs w-44" value={filterResponsable} onChange={(e) => setFilterResponsable(e.target.value)}>
             <option value="">Responsable</option>
             {RESPONSABLES.map((r) => <option key={r} value={r}>{r}</option>)}
-          </select>
-          <select className="select-field h-8 text-xs w-36" value={filterContactado} onChange={(e) => setFilterContactado(e.target.value)}>
-            <option value="">Contactado</option>
-            <option value="si">Contactado</option>
-            <option value="no">No contactado</option>
           </select>
         </div>
       </div>
