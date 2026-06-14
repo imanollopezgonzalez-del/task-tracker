@@ -72,13 +72,12 @@ export const CONTACTO_STAGES = {
   llamada:           { label: 'Llamada (Solicitud de datos)', color: 'bg-slate-100 text-slate-700 border-slate-200',  dot: 'bg-slate-600',  kanban: '#475569', order: 4 },
   envio_muestras:    { label: 'Envío muestras / Demo',        color: 'bg-sky-50 text-sky-700 border-sky-200',         dot: 'bg-sky-600',    kanban: '#0369A1', order: 5 },
   seguimiento:       { label: 'Seguimiento muestras',         color: 'bg-teal-50 text-teal-700 border-teal-200',      dot: 'bg-teal-500',   kanban: '#0D9488', order: 6 },
-  cierre:            { label: 'Cierre',                       color: 'bg-gray-100 text-gray-500 border-gray-200',     dot: 'bg-gray-500',   kanban: '#6B7280', order: 7 },
-  ganado:            { label: 'Ganado',                       color: 'bg-green-50 text-green-700 border-green-200',   dot: 'bg-green-500',  kanban: '#16A34A', order: 8 },
-  perdido:           { label: 'Perdido',                      color: 'bg-red-50 text-red-600 border-red-200',         dot: 'bg-red-400',    kanban: '#DC2626', order: 9 },
+  ganado:            { label: 'Ganado',                       color: 'bg-green-50 text-green-700 border-green-200',   dot: 'bg-green-500',  kanban: '#16A34A', order: 7 },
+  perdido:           { label: 'Perdido',                      color: 'bg-red-50 text-red-600 border-red-200',         dot: 'bg-red-400',    kanban: '#DC2626', order: 8 },
 }
 
 export const CONTACTO_PIPELINE = [
-  'contactado', 'envio_info', 'respuesta_cliente', 'llamada', 'envio_muestras', 'seguimiento', 'cierre',
+  'contactado', 'envio_info', 'respuesta_cliente', 'llamada', 'envio_muestras', 'seguimiento',
 ]
 
 export const TIPO_CLIENTE_COLORS = {

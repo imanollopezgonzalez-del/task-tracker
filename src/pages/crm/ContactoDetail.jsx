@@ -161,9 +161,14 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
   const handleSave = async () => {
     if (!editText.trim()) return
     setSaving(true)
-    await onEdit(nota.id, editText.trim())
-    setSaving(false)
-    setEditing(false)
+    try {
+      await onEdit(nota.id, editText.trim())
+      setEditing(false)
+    } catch {
+      toast.error('Error al guardar la nota')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
