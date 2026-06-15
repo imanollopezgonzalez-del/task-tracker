@@ -10,6 +10,7 @@ import { CheckSquare, Clock, AlertCircle, TrendingUp, RefreshCw, Eye, SlidersHor
 import Avatar from '../components/ui/Avatar'
 import { useUsers } from '../hooks/useUsers'
 import { updateTask, completeAndRecur } from '../services/tasks'
+import { updateLead } from '../services/leads'
 import { createNotification } from '../services/notifications'
 import toast from 'react-hot-toast'
 
@@ -320,6 +321,18 @@ export default function Tasks() {
       } else {
         await updateTask(task.id, { status: 'done' })
         toast.success('✓ Tarea finalizada')
+      }
+      // Si es tarea de seguimiento de cliente, actualizar ficha
+      if (task.clienteId) {
+        const hoy = new Date()
+        const nextDate = new Date(hoy)
+        nextDate.setDate(nextDate.getDate() + 45)
+        const fmt = (d) => d.toISOString().split('T')[0]
+        await updateLead(task.clienteId, {
+          ultimoSeguimiento: fmt(hoy),
+          proximoSeguimiento: fmt(nextDate),
+          seguimientoTaskId: null,
+        })
       }
     } catch { toast.error('Error al completar la tarea') }
   }

@@ -23,7 +23,7 @@ const CRM_NAV = [
   { to: '/crm/mailing', icon: Mail, label: 'Mailing', disabled: true },
   { to: '/crm/leads', icon: UserPlus, label: 'Leads' },
   { to: '/crm/contactos', icon: Contact, label: 'Contactos' },
-  { to: '/crm/clientes', icon: Briefcase, label: 'Clientes', disabled: true },
+  { to: '/crm/clientes', icon: Briefcase, label: 'Clientes' },
   { to: '/crm/panel', icon: TrendingUp, label: 'Panel de ventas', disabled: true },
 ]
 

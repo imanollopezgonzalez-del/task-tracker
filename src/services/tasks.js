@@ -87,6 +87,28 @@ export const subscribeComments = (taskId, callback) => {
   }, (err) => console.error('subscribeComments error:', err))
 }
 
+export const createSeguimientoTask = async (companyId, cliente, assignedToUid, tipo = 'cliente_activo') => {
+  const title = tipo === 'cliente_perdido'
+    ? `Seguimiento Cliente Perdido "${cliente.nombre}"`
+    : `Seguimiento "${cliente.nombre}"`
+  const ref = await addDoc(collection(db, TASKS_COL), {
+    companyId,
+    title,
+    description: 'Contactar al cliente para verificar su estado actual.',
+    priority: 'important',
+    status: 'not_started',
+    type: 'single',
+    assignedTo: assignedToUid,
+    clienteId: cliente.id,
+    seguimientoType: tipo,
+    dueDate: Timestamp.fromDate(new Date()),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    completedAt: null,
+  })
+  return ref.id
+}
+
 export const completeAndRecur = async (task, userId) => {
   const batch = writeBatch(db)
   batch.update(doc(db, TASKS_COL, task.id), {

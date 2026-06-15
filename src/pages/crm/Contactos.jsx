@@ -214,7 +214,18 @@ export default function Contactos() {
     if (!card || card.estadoContacto === targetStage) return
 
     if (targetStage === 'ganado') {
-      await updateLead(cardId, { registroTipo: 'cliente', estadoContacto: 'ganado' })
+      const hoy = new Date()
+      const nextDate = new Date(hoy)
+      nextDate.setDate(nextDate.getDate() + 45)
+      const fmt = (d) => d.toISOString().split('T')[0]
+      await updateLead(cardId, {
+        registroTipo: 'cliente',
+        estadoContacto: 'ganado',
+        clienteEstado: 'activo',
+        fechaCierre: fmt(hoy),
+        anoAlta: hoy.getFullYear(),
+        proximoSeguimiento: fmt(nextDate),
+      })
       toast.success('¡Ganado! Movido a Clientes')
     } else if (targetStage === 'perdido') {
       await updateLead(cardId, { registroTipo: 'lead', estado: 'reintentar_contacto', estadoContacto: null, esCliente: false })

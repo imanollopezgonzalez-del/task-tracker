@@ -1,66 +1,33 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Edit2, Trash2, CheckCircle, XCircle,
-  StickyNote, AlertCircle, Send, Phone, Mail, User,
+  ArrowLeft, Edit2, Trash2, XCircle, TrendingDown, RotateCcw,
+  StickyNote, AlertCircle, Send, Phone, Mail, User, Calendar,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
 import {
-  CONTACTO_STAGES, CONTACTO_PIPELINE, NOTE_TYPES, TIPO_CLIENTE_COLORS,
+  CONTACTO_STAGES, NOTE_TYPES, TIPO_CLIENTE_COLORS,
   TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, RESPONSABLES,
 } from '../../utils/crmConstants'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
-
-// ── Pipeline ──────────────────────────────────────────────────────────────────
-
-function PipelineBar({ current, onChange }) {
-  const currentIdx = CONTACTO_PIPELINE.indexOf(current)
-  return (
-    <div className="flex items-stretch">
-      {CONTACTO_PIPELINE.map((step, i) => {
-        const s = CONTACTO_STAGES[step]
-        const isActive = step === current
-        const isPast = i < currentIdx
-        return (
-          <button
-            key={step}
-            onClick={() => onChange(step)}
-            className={`
-              flex-1 px-1 py-1.5 text-xs font-medium border-y border-r
-              first:border-l first:rounded-l-lg last:rounded-r-lg transition-colors truncate
-              ${isPast ? 'bg-green-500 text-white border-green-500' : ''}
-              ${!isActive && !isPast ? 'bg-white text-brand-text-muted border-brand-border hover:bg-brand-bg-2' : ''}
-            `}
-            style={isActive ? { backgroundColor: s.kanban, borderColor: s.kanban, color: 'white' } : {}}
-          >
-            {s.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
 
 // ── Inline editing ─────────────────────────────────────────────────────────────
 
 function InlineText({ value, onChange, placeholder = '—' }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value || '')
-
   const commit = () => {
     setEditing(false)
     const trimmed = draft.trim()
     if (trimmed !== (value || '').trim()) onChange(trimmed)
   }
-
   if (editing) {
     return (
       <input
         className="w-full text-sm text-brand-text border border-brand-border rounded px-2 py-0.5 outline-none focus:border-brand-orange bg-white"
-        value={draft}
-        autoFocus
+        value={draft} autoFocus
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
@@ -70,7 +37,6 @@ function InlineText({ value, onChange, placeholder = '—' }) {
       />
     )
   }
-
   return (
     <p
       className={`text-sm font-medium cursor-pointer hover:bg-brand-bg-2 rounded px-1 -mx-1 py-0.5 ${value ? 'text-brand-text' : 'text-brand-text-light italic'}`}
@@ -84,13 +50,11 @@ function InlineText({ value, onChange, placeholder = '—' }) {
 
 function InlineSelect({ value, options, onChange, placeholder = '—', renderValue }) {
   const [editing, setEditing] = useState(false)
-
   if (editing) {
     return (
       <select
         className="w-full text-sm border border-brand-border rounded px-2 py-1 outline-none focus:border-brand-orange bg-white"
-        value={value || ''}
-        autoFocus
+        value={value || ''} autoFocus
         onChange={(e) => { onChange(e.target.value); setEditing(false) }}
         onBlur={() => setEditing(false)}
       >
@@ -103,48 +67,13 @@ function InlineSelect({ value, options, onChange, placeholder = '—', renderVal
       </select>
     )
   }
-
   return (
-    <div
-      className="cursor-pointer hover:bg-brand-bg-2 rounded px-1 -mx-1 py-0.5 min-h-[24px]"
-      onClick={() => setEditing(true)}
-      title="Click para editar"
-    >
+    <div className="cursor-pointer hover:bg-brand-bg-2 rounded px-1 -mx-1 py-0.5 min-h-[24px]" onClick={() => setEditing(true)} title="Click para editar">
       {renderValue
         ? renderValue(value)
         : <p className={`text-sm font-medium ${value ? 'text-brand-text' : 'text-brand-text-light italic'}`}>{value || placeholder}</p>
       }
     </div>
-  )
-}
-
-function InlineDate({ value, onChange, placeholder = '—' }) {
-  const [editing, setEditing] = useState(false)
-  const formatted = value
-    ? new Date(value + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : null
-
-  if (editing) {
-    return (
-      <input
-        type="date"
-        className="w-full text-sm border border-brand-border rounded px-2 py-0.5 outline-none focus:border-brand-orange bg-white"
-        value={value || ''}
-        autoFocus
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => setEditing(false)}
-      />
-    )
-  }
-
-  return (
-    <p
-      className={`text-sm font-medium cursor-pointer hover:bg-brand-bg-2 rounded px-1 -mx-1 py-0.5 ${value ? 'text-brand-text' : 'text-brand-text-light italic'}`}
-      onClick={() => setEditing(true)}
-      title="Click para editar"
-    >
-      {formatted || placeholder}
-    </p>
   )
 }
 
@@ -177,16 +106,13 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
         <div className="flex items-start gap-2 flex-1 min-w-0">
           {isImportante
             ? <AlertCircle size={14} className="text-brand-orange mt-0.5 flex-shrink-0" />
-            : <StickyNote size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
-          }
+            : <StickyNote size={14} className="text-brand-text-muted mt-0.5 flex-shrink-0" />}
           {editing ? (
             <div className="flex-1">
               <textarea
                 className="w-full text-sm text-brand-text resize-none outline-none bg-white border border-brand-border rounded-lg px-2 py-1.5"
-                rows={3}
-                value={editText}
+                rows={3} value={editText} autoFocus
                 onChange={(e) => setEditText(e.target.value)}
-                autoFocus
               />
               <div className="flex gap-2 mt-1.5">
                 <button onClick={handleSave} disabled={saving} className="btn-primary py-0.5 px-2 text-xs">
@@ -216,7 +142,7 @@ function NotaItem({ nota, onDelete, onEdit, canDelete }) {
   )
 }
 
-// ── Contacts view (read-only, edit via modal) ──────────────────────────────────
+// ── Contacts view ──────────────────────────────────────────────────────────────
 
 function ContactoCard({ c, index, total }) {
   const emails = (c.emails || []).filter(Boolean)
@@ -242,23 +168,67 @@ function ContactoCard({ c, index, total }) {
       {emails.map((e, ei) => (
         <div key={ei} className="flex items-start gap-2 py-0.5">
           <Mail size={13} className="text-brand-text-muted mt-0.5 flex-shrink-0" />
-          <div className="min-w-0 flex-1">
-            {emails.length > 1 && <p className="text-xs text-brand-text-muted leading-none mb-0.5">Email {ei + 1}</p>}
-            <p className="text-sm text-brand-text font-medium break-words">{e}</p>
-          </div>
+          <p className="text-sm text-brand-text font-medium break-words">{e}</p>
         </div>
       ))}
     </div>
   )
 }
 
+// ── Seguimiento section ────────────────────────────────────────────────────────
+
+function SeguimientoPanel({ cliente, onRegistrar }) {
+  const hoy = new Date()
+  const proxDate = cliente.proximoSeguimiento
+    ? new Date(cliente.proximoSeguimiento + 'T12:00:00')
+    : null
+  const isPendiente = !proxDate || proxDate <= hoy
+  const fmtDate = (str) => str
+    ? new Date(str + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '—'
+
+  return (
+    <div className="py-2">
+      <p className="text-xs text-brand-text-muted mb-2">Seguimiento (cada 45 días)</p>
+      <div className="space-y-1.5">
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-brand-text-muted flex items-center gap-1"><Calendar size={11} /> Último</span>
+          <span className="text-xs text-brand-text font-medium">{fmtDate(cliente.ultimoSeguimiento)}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-xs text-brand-text-muted flex items-center gap-1"><Calendar size={11} /> Próximo</span>
+          <span className={`text-xs font-medium ${isPendiente ? 'text-red-600' : 'text-green-700'}`}>
+            {fmtDate(cliente.proximoSeguimiento)}
+          </span>
+        </div>
+        <div className="mt-1">
+          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium border ${
+            isPendiente
+              ? 'bg-gray-100 text-gray-600 border-gray-200'
+              : 'bg-green-50 text-green-700 border-green-200'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isPendiente ? 'bg-gray-400' : 'bg-green-500'}`} />
+            {isPendiente ? 'Pendiente' : 'Contactado'}
+          </span>
+        </div>
+        <button
+          onClick={onRegistrar}
+          className="w-full mt-1 py-1.5 text-xs font-medium text-brand-orange border border-brand-orange/40 rounded-lg hover:bg-orange-50 transition-colors"
+        >
+          Registrar seguimiento
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 
-export default function ContactoDetail() {
+export default function ClienteDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { currentUser, userProfile } = useAuth()
-  const [contacto, setContacto] = useState(null)
+  const [cliente, setCliente] = useState(null)
   const [notas, setNotas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
@@ -267,55 +237,84 @@ export default function ContactoDetail() {
   const [savingNota, setSavingNota] = useState(false)
 
   useEffect(() => {
-    getLead(id).then((data) => { setContacto(data); setLoading(false) })
+    getLead(id).then((data) => { setCliente(data); setLoading(false) })
   }, [id])
 
-  const refreshContacto = () => getLead(id).then(setContacto)
+  const refreshCliente = () => getLead(id).then(setCliente)
 
   useEffect(() => {
     const unsub = subscribeNotas(id, setNotas)
     return unsub
   }, [id])
 
-  const handleStageChange = async (newStage) => {
-    await updateLead(id, { estadoContacto: newStage })
-    setContacto((c) => ({ ...c, estadoContacto: newStage }))
-    toast.success(`Etapa: "${CONTACTO_STAGES[newStage]?.label}"`)
-  }
-
   const handleSave = async (field, value) => {
     await updateLead(id, { [field]: value })
-    setContacto((c) => ({ ...c, [field]: value }))
+    setCliente((c) => ({ ...c, [field]: value }))
   }
 
-  const handleGanado = async () => {
+  const handleMarcarPerdido = async () => {
+    if (!window.confirm(`¿Marcar "${cliente?.nombre}" como cliente perdido?`)) return
+    const today = new Date().toISOString().split('T')[0]
+    await updateLead(id, {
+      clienteEstado: 'perdido',
+      fechaPerdido: today,
+      seguimientoTaskId: null,
+    })
+    setCliente((c) => ({ ...c, clienteEstado: 'perdido', fechaPerdido: today, seguimientoTaskId: null }))
+    toast.success('Cliente marcado como perdido')
+  }
+
+  const handleRecuperar = async () => {
     const hoy = new Date()
     const nextDate = new Date(hoy)
     nextDate.setDate(nextDate.getDate() + 45)
     const fmt = (d) => d.toISOString().split('T')[0]
     await updateLead(id, {
-      registroTipo: 'cliente',
-      estadoContacto: 'ganado',
       clienteEstado: 'activo',
-      fechaCierre: fmt(hoy),
-      anoAlta: hoy.getFullYear(),
+      fechaPerdido: null,
       proximoSeguimiento: fmt(nextDate),
+      seguimientoTaskId: null,
     })
-    toast.success('¡Ganado! Movido a Clientes')
-    navigate('/crm/clientes')
+    setCliente((c) => ({ ...c, clienteEstado: 'activo', fechaPerdido: null, proximoSeguimiento: fmt(nextDate) }))
+    toast.success('Cliente recuperado')
   }
 
-  const handlePerdido = async () => {
-    await updateLead(id, { registroTipo: 'lead', estado: 'reintentar_contacto', estadoContacto: null, esCliente: false })
-    toast.success('Volvió a Leads como "Reintentar contacto"')
+  const handleDevolverAContactos = async () => {
+    if (!window.confirm(`¿Devolver "${cliente?.nombre}" al módulo de Contactos?`)) return
+    await updateLead(id, {
+      registroTipo: 'contacto',
+      clienteEstado: null,
+      anoAlta: null,
+      fechaCierre: null,
+      proximoSeguimiento: null,
+      ultimoSeguimiento: null,
+      seguimientoTaskId: null,
+      estadoContacto: 'seguimiento',
+    })
+    toast.success('Movido de vuelta a Contactos')
     navigate('/crm/contactos')
   }
 
   const handleDelete = async () => {
-    if (!window.confirm(`¿Eliminar "${contacto?.nombre}"?`)) return
+    if (!window.confirm(`¿Eliminar permanentemente "${cliente?.nombre}"?`)) return
     await deleteLead(id)
-    toast.success('Eliminado')
-    navigate('/crm/contactos')
+    toast.success('Cliente eliminado')
+    navigate('/crm/clientes')
+  }
+
+  const handleRegistrarSeguimiento = async () => {
+    const hoy = new Date()
+    const nextDate = new Date(hoy)
+    nextDate.setDate(nextDate.getDate() + 45)
+    const fmt = (d) => d.toISOString().split('T')[0]
+    const updates = {
+      ultimoSeguimiento: fmt(hoy),
+      proximoSeguimiento: fmt(nextDate),
+      seguimientoTaskId: null,
+    }
+    await updateLead(id, updates)
+    setCliente((c) => ({ ...c, ...updates }))
+    toast.success('Seguimiento registrado. Próximo en 45 días.')
   }
 
   const handleAddNota = async (e) => {
@@ -333,79 +332,67 @@ export default function ContactoDetail() {
   const handleDeleteNota = async (notaId) => { await deleteNota(id, notaId); toast.success('Nota eliminada') }
   const handleEditNota = async (notaId, texto) => { await updateNota(id, notaId, texto) }
 
-  if (loading) return (
-    <div className="flex items-center justify-center h-full text-brand-text-muted text-sm">Cargando...</div>
-  )
-  if (!contacto) return (
+  if (loading) return <div className="flex items-center justify-center h-full text-brand-text-muted text-sm">Cargando...</div>
+  if (!cliente) return (
     <div className="flex flex-col items-center justify-center h-full gap-3">
-      <p className="text-brand-text-muted text-sm">Contacto no encontrado</p>
-      <button onClick={() => navigate('/crm/contactos')} className="btn-secondary text-xs">Volver</button>
+      <p className="text-brand-text-muted text-sm">Cliente no encontrado</p>
+      <button onClick={() => navigate('/crm/clientes')} className="btn-secondary text-xs">Volver</button>
     </div>
   )
 
-  const currentStage = contacto.estadoContacto || 'contactado'
-  const stage = CONTACTO_STAGES[currentStage] || CONTACTO_STAGES.contactado
-  const isTerminal = ['ganado', 'perdido'].includes(currentStage)
+  const isPerdido = cliente.clienteEstado === 'perdido'
+  const fmtFecha = (str) => str
+    ? new Date(str + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : '—'
 
-  const contactosList = contacto.contactos?.length > 0
-    ? contacto.contactos
-    : (contacto.personaContacto || contacto.telefono || contacto.email)
-      ? [{ nombre: contacto.personaContacto, puesto: contacto.puesto, telefono: contacto.telefono, emails: contacto.email ? [contacto.email] : [] }]
+  const contactosList = cliente.contactos?.length > 0
+    ? cliente.contactos
+    : (cliente.personaContacto || cliente.telefono || cliente.email)
+      ? [{ nombre: cliente.personaContacto, puesto: cliente.puesto, telefono: cliente.telefono, emails: cliente.email ? [cliente.email] : [] }]
       : []
-
-  const stageOptions = Object.entries(CONTACTO_STAGES).map(([k, v]) => ({ key: k, label: v.label }))
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
-      <div className="px-5 py-3 border-b border-brand-border bg-white flex items-center gap-3 flex-shrink-0">
-        <button onClick={() => navigate('/crm/contactos')} className="btn-ghost p-1.5">
+      <div className="px-5 py-3 border-b border-brand-border bg-white flex items-center gap-3 flex-shrink-0 flex-wrap">
+        <button onClick={() => navigate('/crm/clientes')} className="btn-ghost p-1.5">
           <ArrowLeft size={16} />
         </button>
-        <h1 className="text-base font-bold text-brand-text flex-1 truncate">{contacto.nombre}</h1>
-        <button
-          onClick={handleGanado}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            currentStage === 'ganado'
-              ? 'bg-green-500 text-white border-green-500'
-              : 'bg-white text-green-700 border-green-200 hover:bg-green-50'
-          }`}
-        >
-          <CheckCircle size={13} /> Ganado
-        </button>
-        <button
-          onClick={handlePerdido}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            currentStage === 'perdido'
-              ? 'bg-red-500 text-white border-red-500'
-              : 'bg-white text-red-600 border-red-200 hover:bg-red-50'
-          }`}
-        >
-          <XCircle size={13} /> Perdido
-        </button>
-      </div>
+        <h1 className="text-base font-bold text-brand-text flex-1 truncate">{cliente.nombre}</h1>
 
-      {/* Pipeline — full width */}
-      <div className="px-5 py-3 border-b border-brand-border bg-white flex-shrink-0">
-        <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-2">
-          Etapas de la oportunidad de venta
-        </p>
-        {isTerminal ? (
-          <div className="flex items-center gap-2">
-            <span className={`badge border text-xs ${stage.color}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${stage.dot}`} />
-              {stage.label}
-            </span>
-            <button onClick={() => handleStageChange('contactado')} className="text-xs text-brand-text-muted hover:text-brand-text underline">
-              Reabrir
-            </button>
-          </div>
+        {isPerdido ? (
+          <button
+            onClick={handleRecuperar}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-green-700 border-green-200 hover:bg-green-50 transition-colors"
+          >
+            <RotateCcw size={13} /> Recuperar cliente
+          </button>
         ) : (
-          <PipelineBar current={currentStage} onChange={handleStageChange} />
+          <button
+            onClick={handleMarcarPerdido}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-red-600 border-red-200 hover:bg-red-50 transition-colors"
+          >
+            <TrendingDown size={13} /> Marcar perdido
+          </button>
+        )}
+
+        <button
+          onClick={handleDevolverAContactos}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-brand-text-muted border-brand-border hover:bg-brand-bg-2 transition-colors"
+        >
+          <XCircle size={13} /> Devolver a Contactos
+        </button>
+
+        {isPerdido && (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-600 border border-red-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            Cliente Perdido
+            {cliente.fechaPerdido && <span className="text-red-400 ml-1">· {fmtFecha(cliente.fechaPerdido)}</span>}
+          </div>
         )}
       </div>
 
-      {/* Body: notes + right panel start at same level */}
+      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
         {/* Notes panel */}
         <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -453,7 +440,7 @@ export default function ContactoDetail() {
         {/* Right panel */}
         <div className="w-72 flex-shrink-0 border-l border-brand-border bg-white overflow-y-auto">
           <div className="px-4 py-3 border-b border-brand-border flex items-center justify-between">
-            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Información</p>
+            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Información de cliente</p>
             <div className="flex items-center gap-1">
               <button onClick={() => setShowEdit(true)} className="btn-ghost p-1" title="Editar contactos">
                 <Edit2 size={14} />
@@ -467,32 +454,13 @@ export default function ContactoDetail() {
           <div className="px-4 py-2 divide-y divide-brand-border">
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Nombre</p>
-              <InlineText value={contacto.nombre} onChange={(v) => handleSave('nombre', v)} placeholder="Sin nombre" />
-            </div>
-
-            <div className="py-2">
-              <p className="text-xs text-brand-text-muted mb-1">Estado</p>
-              <InlineSelect
-                value={currentStage}
-                options={stageOptions}
-                onChange={(v) => handleStageChange(v)}
-                placeholder="Sin estado"
-                renderValue={(v) => {
-                  const s = CONTACTO_STAGES[v] || CONTACTO_STAGES.contactado
-                  return (
-                    <span className={`badge border text-xs ${s.color}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                      {s.label}
-                    </span>
-                  )
-                }}
-              />
+              <InlineText value={cliente.nombre} onChange={(v) => handleSave('nombre', v)} placeholder="Sin nombre" />
             </div>
 
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Tipo de cliente</p>
               <InlineSelect
-                value={contacto.tipoCliente}
+                value={cliente.tipoCliente}
                 options={TIPOS_CLIENTE}
                 onChange={(v) => handleSave('tipoCliente', v)}
                 placeholder="Sin tipo"
@@ -506,7 +474,7 @@ export default function ContactoDetail() {
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Producto</p>
               <InlineSelect
-                value={contacto.producto}
+                value={cliente.producto}
                 options={PRODUCTOS}
                 onChange={(v) => handleSave('producto', v)}
                 placeholder="Sin producto"
@@ -519,12 +487,7 @@ export default function ContactoDetail() {
 
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Kilos mensuales</p>
-              <InlineText value={contacto.kilosMensuales} onChange={(v) => handleSave('kilosMensuales', v)} placeholder="—" />
-            </div>
-
-            <div className="py-2">
-              <p className="text-xs text-brand-text-muted mb-1">Fecha estimada de cierre</p>
-              <InlineDate value={contacto.fechaCierre} onChange={(v) => handleSave('fechaCierre', v)} placeholder="—" />
+              <InlineText value={cliente.kilosMensuales} onChange={(v) => handleSave('kilosMensuales', v)} placeholder="—" />
             </div>
 
             <div className="py-2">
@@ -537,13 +500,13 @@ export default function ContactoDetail() {
 
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Ubicación</p>
-              <InlineText value={contacto.ubicacion} onChange={(v) => handleSave('ubicacion', v)} placeholder="Sin ubicación" />
+              <InlineText value={cliente.ubicacion} onChange={(v) => handleSave('ubicacion', v)} placeholder="Sin ubicación" />
             </div>
 
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Responsable</p>
               <InlineSelect
-                value={contacto.responsable}
+                value={cliente.responsable}
                 options={RESPONSABLES}
                 onChange={(v) => handleSave('responsable', v)}
                 placeholder="Sin responsable"
@@ -553,11 +516,24 @@ export default function ContactoDetail() {
             <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Origen del contacto</p>
               <InlineSelect
-                value={contacto.origenContacto}
+                value={cliente.origenContacto}
                 options={ORIGENES_CONTACTO}
                 onChange={(v) => handleSave('origenContacto', v)}
                 placeholder="Sin origen"
               />
+            </div>
+
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Fecha de alta</p>
+              <p className="text-sm font-medium text-brand-text">
+                {cliente.fechaCierre
+                  ? new Date(cliente.fechaCierre + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+                  : '—'}
+              </p>
+            </div>
+
+            <div className="py-2 border-t-2 border-brand-border">
+              <SeguimientoPanel cliente={cliente} onRegistrar={handleRegistrarSeguimiento} />
             </div>
           </div>
         </div>
@@ -565,10 +541,10 @@ export default function ContactoDetail() {
 
       {showEdit && (
         <LeadForm
-          lead={contacto}
+          lead={cliente}
           companyId={userProfile?.companyId}
           showContactoFields
-          onClose={() => { setShowEdit(false); refreshContacto() }}
+          onClose={() => { setShowEdit(false); refreshCliente() }}
         />
       )}
     </div>

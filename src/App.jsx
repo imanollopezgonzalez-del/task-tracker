@@ -15,6 +15,8 @@ import Leads from './pages/crm/Leads'
 import LeadDetail from './pages/crm/LeadDetail'
 import Contactos from './pages/crm/Contactos'
 import ContactoDetail from './pages/crm/ContactoDetail'
+import Clientes from './pages/crm/Clientes'
+import ClienteDetail from './pages/crm/ClienteDetail'
 import Spinner from './components/ui/Spinner'
 
 function ProtectedRoute({ children }) {
@@ -51,6 +53,8 @@ function AppRoutes() {
       <Route path="/crm/leads/:id" element={<ProtectedRoute><LeadDetail /></ProtectedRoute>} />
       <Route path="/crm/contactos" element={<ProtectedRoute><Contactos /></ProtectedRoute>} />
       <Route path="/crm/contactos/:id" element={<ProtectedRoute><ContactoDetail /></ProtectedRoute>} />
+      <Route path="/crm/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
+      <Route path="/crm/clientes/:id" element={<ProtectedRoute><ClienteDetail /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/tasks" replace />} />
     </Routes>
   )
