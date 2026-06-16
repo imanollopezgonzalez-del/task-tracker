@@ -84,13 +84,15 @@ function filterByView(tasks, view) {
           const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
           if (!dom) return false
           const sched = new Date(now.getFullYear(), now.getMonth(), dom)
-          return sched >= wStart && sched <= wEnd
+          // Mostrar si cae esta semana O si ya pasó (vencida sin completar)
+          return sched <= wEnd
         }
         if (t.recurrence === 'annual') {
           const base = due || start
           if (!base) return false
           const sched = new Date(now.getFullYear(), base.getMonth(), base.getDate())
-          return sched >= wStart && sched <= wEnd
+          // Mostrar si cae esta semana O si ya pasó (vencida sin completar)
+          return sched <= wEnd
         }
         return false
       }
