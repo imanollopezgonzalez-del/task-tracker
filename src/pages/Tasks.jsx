@@ -61,11 +61,15 @@ function filterByView(tasks, view) {
         }
         if (t.recurrence === 'monthly') {
           const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
-          return dom ? now.getDate() === dom : false
+          // Mostrar si hoy ES el día programado O si ya pasó (vencida sin completar)
+          return dom ? now.getDate() >= dom : false
         }
         if (t.recurrence === 'annual') {
           const base = due || start
-          return base ? now.getDate() === base.getDate() && now.getMonth() === base.getMonth() : false
+          if (!base) return false
+          const sched = new Date(now.getFullYear(), base.getMonth(), base.getDate())
+          // Mostrar si hoy ES la fecha programada O si ya pasó (vencida sin completar)
+          return sched <= startOfDay(now)
         }
         return false
       }
