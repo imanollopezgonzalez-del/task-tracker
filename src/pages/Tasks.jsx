@@ -258,13 +258,6 @@ export default function Tasks() {
   useEffect(() => { setRecurringOrder([]) }, [recurringCol.sort, recurringCol.search, recurringCol.priority])
   useEffect(() => { setSupervisionOrder([]) }, [supervisionCol.sort, supervisionCol.search, supervisionCol.priority])
 
-  useEffect(() => {
-    if (!companyId) return
-    setNormalOrder(loadOrder(companyId, viewUid, 'normal'))
-    setRecurringOrder(loadOrder(companyId, viewUid, 'recurring'))
-    setSupervisionOrder(loadOrder(companyId, viewUid, 'supervision'))
-  }, [companyId, viewUid])
-
   const sourceTasks = useMemo(() => {
     if (!isAdmin) return myTasks
     if (selectedUid === 'all') return allTasks
@@ -276,6 +269,13 @@ export default function Tasks() {
     if (!isAdmin) return currentUser?.uid
     return selectedUid === 'me' ? currentUser?.uid : selectedUid === 'all' ? null : selectedUid
   }, [isAdmin, selectedUid, currentUser])
+
+  useEffect(() => {
+    if (!companyId) return
+    setNormalOrder(loadOrder(companyId, viewUid, 'normal'))
+    setRecurringOrder(loadOrder(companyId, viewUid, 'recurring'))
+    setSupervisionOrder(loadOrder(companyId, viewUid, 'supervision'))
+  }, [companyId, viewUid])
 
   const viewTasks = useMemo(() => filterByView(sourceTasks, activeView), [sourceTasks, activeView])
 
