@@ -54,9 +54,16 @@ export default function TaskCard({
       onDragOver={sortable ? (e) => e.preventDefault() : undefined}
       onDrop={sortable ? (e) => { e.preventDefault(); onDrop?.() } : undefined}
       className={[
-        'card hover:shadow-card-hover transition-all duration-200 group relative',
-        overdue ? 'border-red-200' : '',
-        isDone ? 'opacity-70' : '',
+        'rounded-xl border shadow-card hover:shadow-card-hover transition-all duration-200 group relative',
+        isDone
+          ? 'bg-white border-brand-border opacity-70'
+          : overdue
+            ? 'bg-red-50 border-red-300'
+            : task.priority === 'urgent'
+              ? 'bg-priority-urgent-bg border-priority-urgent-border'
+              : task.priority === 'important'
+                ? 'bg-priority-important-bg border-priority-important-border'
+                : 'bg-priority-low-bg border-priority-low-border',
         dragging ? 'opacity-40 scale-95' : '',
         sortable ? 'pl-6' : '',
       ].join(' ')}

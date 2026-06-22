@@ -22,6 +22,19 @@ function applyOrder(tasks, order) {
   return [...ordered, ...fresh]
 }
 
+function loadOrder(companyId, viewUid, col) {
+  try {
+    const raw = localStorage.getItem(`taskOrder_${companyId}_${viewUid || 'all'}_${col}`)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveOrder(companyId, viewUid, col, order) {
+  try {
+    localStorage.setItem(`taskOrder_${companyId}_${viewUid || 'all'}_${col}`, JSON.stringify(order))
+  } catch {}
+}
+
 const SORT_OPTS = [
   { value: 'priority', label: 'Urgencia' },
   { value: 'dueDate', label: 'Fecha límite' },
@@ -223,6 +236,7 @@ export default function Tasks() {
   const { currentUser, userProfile } = useAuth()
   const { users } = useUsers()
   const isAdmin = userProfile?.role === 'admin'
+  const companyId = userProfile?.companyId || ''
 
   const [activeView, setActiveView] = useState('today')
   const [showModal, setShowModal] = useState(false)
@@ -243,6 +257,13 @@ export default function Tasks() {
   useEffect(() => { setNormalOrder([]) }, [normalCol.sort, normalCol.search, normalCol.priority])
   useEffect(() => { setRecurringOrder([]) }, [recurringCol.sort, recurringCol.search, recurringCol.priority])
   useEffect(() => { setSupervisionOrder([]) }, [supervisionCol.sort, supervisionCol.search, supervisionCol.priority])
+
+  useEffect(() => {
+    if (!companyId) return
+    setNormalOrder(loadOrder(companyId, viewUid, 'normal'))
+    setRecurringOrder(loadOrder(companyId, viewUid, 'recurring'))
+    setSupervisionOrder(loadOrder(companyId, viewUid, 'supervision'))
+  }, [companyId, viewUid])
 
   const sourceTasks = useMemo(() => {
     if (!isAdmin) return myTasks
@@ -307,6 +328,7 @@ export default function Tasks() {
     next.splice(fi, 1)
     next.splice(ti, 0, src)
     setOrder(next)
+    saveOrder(companyId, viewUid, col, next)
     dragSrc.current = null
     dragOver.current = null
   }
