@@ -9,12 +9,10 @@ import { Calendar, RefreshCw, AlertCircle, CheckCircle2, GripVertical, Pencil } 
 
 const tsToDate = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
 
-const STATUS_CARD = {
-  not_started:          'bg-task-not-started-bg border-slate-200',
-  in_progress:          'bg-task-in-progress-bg border-blue-200',
-  pending_response:     'bg-task-pending-response-bg border-amber-200',
-  pending_adjustments:  'bg-task-pending-adjustments-bg border-orange-200',
-  done:                 'bg-task-done-bg border-green-200',
+const PRIORITY_CARD = {
+  urgent:    'bg-red-100 border-red-300',
+  important: 'bg-amber-100 border-amber-300',
+  low:       'bg-green-100 border-green-300',
 }
 
 function getRecurrencePattern(task) {
@@ -64,8 +62,8 @@ export default function TaskCard({
       className={[
         'rounded-xl border shadow-card hover:shadow-card-hover transition-all duration-200 group relative',
         overdue && !isDone
-          ? 'bg-red-50 border-red-300'
-          : STATUS_CARD[task.status] || 'bg-white border-brand-border',
+          ? 'bg-red-100 border-red-400'
+          : PRIORITY_CARD[task.priority] || 'bg-white border-brand-border',
         isDone ? 'opacity-70' : '',
         dragging ? 'opacity-40 scale-95' : '',
         sortable ? 'pl-6' : '',
