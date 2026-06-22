@@ -9,6 +9,14 @@ import { Calendar, RefreshCw, AlertCircle, CheckCircle2, GripVertical, Pencil } 
 
 const tsToDate = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
 
+const STATUS_CARD = {
+  not_started:          'bg-task-not-started-bg border-slate-200',
+  in_progress:          'bg-task-in-progress-bg border-blue-200',
+  pending_response:     'bg-task-pending-response-bg border-amber-200',
+  pending_adjustments:  'bg-task-pending-adjustments-bg border-orange-200',
+  done:                 'bg-task-done-bg border-green-200',
+}
+
 function getRecurrencePattern(task) {
   const cfg = task.recurrenceConfig || {}
   switch (task.recurrence) {
@@ -55,15 +63,10 @@ export default function TaskCard({
       onDrop={sortable ? (e) => { e.preventDefault(); onDrop?.() } : undefined}
       className={[
         'rounded-xl border shadow-card hover:shadow-card-hover transition-all duration-200 group relative',
-        isDone
-          ? 'bg-white border-brand-border opacity-70'
-          : overdue
-            ? 'bg-red-50 border-red-300'
-            : task.priority === 'urgent'
-              ? 'bg-priority-urgent-bg border-priority-urgent-border'
-              : task.priority === 'important'
-                ? 'bg-priority-important-bg border-priority-important-border'
-                : 'bg-priority-low-bg border-priority-low-border',
+        overdue && !isDone
+          ? 'bg-red-50 border-red-300'
+          : STATUS_CARD[task.status] || 'bg-white border-brand-border',
+        isDone ? 'opacity-70' : '',
         dragging ? 'opacity-40 scale-95' : '',
         sortable ? 'pl-6' : '',
       ].join(' ')}
