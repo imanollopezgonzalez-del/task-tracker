@@ -46,6 +46,7 @@ export const ORIGENES_CONTACTO = [
   { key: 'Email Marketing', label: 'Email Marketing', color: '#8B5CF6' },
   { key: 'Contactos Lucho', label: 'Contactos Lucho', color: '#F59E0B' },
   { key: 'Instagram', label: 'Instagram', color: '#E1306C' },
+  { key: 'Jarvis', label: 'Jarvis', color: '#10B981' },
 ]
 
 // Grupos en la lista: orígenes + grupos especiales basados en estado
