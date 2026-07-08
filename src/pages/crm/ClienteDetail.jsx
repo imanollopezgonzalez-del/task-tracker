@@ -8,8 +8,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
 import {
   CONTACTO_STAGES, NOTE_TYPES, TIPO_CLIENTE_COLORS,
-  TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, RESPONSABLES,
+  TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, LISTAS_PRECIO,
 } from '../../utils/crmConstants'
+import { getResponsables } from '../../utils/crmHelpers'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
 
@@ -491,6 +492,16 @@ export default function ClienteDetail() {
             </div>
 
             <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Lista de precios</p>
+              <InlineSelect
+                value={cliente.listaPrecios}
+                options={LISTAS_PRECIO}
+                onChange={(v) => handleSave('listaPrecios', v)}
+                placeholder="Sin lista"
+              />
+            </div>
+
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1.5">Contactos</p>
               {contactosList.length > 0
                 ? contactosList.map((c, i) => <ContactoCard key={i} c={c} index={i} total={contactosList.length} />)
@@ -504,13 +515,11 @@ export default function ClienteDetail() {
             </div>
 
             <div className="py-2">
-              <p className="text-xs text-brand-text-muted mb-1">Responsable</p>
-              <InlineSelect
-                value={cliente.responsable}
-                options={RESPONSABLES}
-                onChange={(v) => handleSave('responsable', v)}
-                placeholder="Sin responsable"
-              />
+              <p className="text-xs text-brand-text-muted mb-1">Responsable(s)</p>
+              {getResponsables(cliente).length > 0
+                ? <p className="text-sm font-medium text-brand-text">{getResponsables(cliente).join(', ')}</p>
+                : <p className="text-sm text-brand-text-light italic">Sin responsable — usar ✏️ Editar</p>
+              }
             </div>
 
             <div className="py-2">
@@ -528,6 +537,15 @@ export default function ClienteDetail() {
               <p className="text-sm font-medium text-brand-text">
                 {cliente.fechaCierre
                   ? new Date(cliente.fechaCierre + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+                  : '—'}
+              </p>
+            </div>
+
+            <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Última actualización</p>
+              <p className="text-sm font-medium text-brand-text">
+                {cliente.updatedAt?.toDate
+                  ? cliente.updatedAt.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
                   : '—'}
               </p>
             </div>

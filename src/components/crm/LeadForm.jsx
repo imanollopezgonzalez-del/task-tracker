@@ -4,8 +4,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import { createLead, updateLead, addNota } from '../../services/leads'
 import {
   LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, PUESTOS,
-  ORIGENES_CONTACTO, RESPONSABLES,
+  ORIGENES_CONTACTO, RESPONSABLES, LISTAS_PRECIO,
 } from '../../utils/crmConstants'
+import { getResponsables } from '../../utils/crmHelpers'
 import toast from 'react-hot-toast'
 
 const EMPTY_CONTACTO = { nombre: '', puesto: '', telefono: '', emails: [''] }
@@ -19,11 +20,12 @@ const EMPTY = {
   producto: '',
   contactos: [{ ...EMPTY_CONTACTO }],
   ubicacion: '',
-  responsable: '',
+  responsables: [],
   origenContacto: '',
   observaciones: '',
   kilosMensuales: '',
   fechaCierre: '',
+  listaPrecios: '',
 }
 
 export default function LeadForm({ lead, companyId, onClose, showContactoFields = false }) {
@@ -47,17 +49,25 @@ export default function LeadForm({ lead, companyId, onClose, showContactoFields 
                 emails: lead.email ? [lead.email] : [''],
               }],
           ubicacion: lead.ubicacion || '',
-          responsable: lead.responsable || '',
+          responsables: getResponsables(lead),
           origenContacto: lead.origenContacto || '',
           observaciones: lead.observaciones || '',
           kilosMensuales: lead.kilosMensuales || '',
           fechaCierre: lead.fechaCierre || '',
+          listaPrecios: lead.listaPrecios || '',
         }
       : { ...EMPTY }
   )
   const [saving, setSaving] = useState(false)
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+
+  const toggleResponsable = (nombre) => setForm((f) => ({
+    ...f,
+    responsables: f.responsables.includes(nombre)
+      ? f.responsables.filter((r) => r !== nombre)
+      : [...f.responsables, nombre],
+  }))
 
   const addContacto = () => setForm((f) => ({
     ...f, contactos: [...f.contactos, { ...EMPTY_CONTACTO, emails: [''] }],
@@ -263,39 +273,67 @@ export default function LeadForm({ lead, companyId, onClose, showContactoFields 
             />
           </div>
 
-          {/* Responsable */}
+          {/* Responsable(s) */}
           <div>
-            <label className="label">Responsable</label>
-            <select className="select-field" value={form.responsable} onChange={(e) => set('responsable', e.target.value)}>
-              <option value="">— Seleccionar —</option>
-              {RESPONSABLES.map((r) => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <label className="label">Responsable(s)</label>
+            <div className="flex flex-wrap gap-2">
+              {RESPONSABLES.map((r) => {
+                const checked = form.responsables.includes(r)
+                return (
+                  <label
+                    key={r}
+                    className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                      checked
+                        ? 'bg-brand-orange-light border-brand-orange text-brand-orange font-medium'
+                        : 'bg-white border-brand-border text-brand-text-muted hover:bg-brand-bg-2'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="accent-brand-orange"
+                      checked={checked}
+                      onChange={() => toggleResponsable(r)}
+                    />
+                    {r}
+                  </label>
+                )
+              })}
+            </div>
           </div>
 
-          {/* Kilos mensuales + Fecha cierre (solo en Contactos) */}
+          {/* Kilos mensuales + Fecha cierre + Lista de precios (solo en Contactos) */}
           {showContactoFields && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="label">Kilos mensuales</label>
-                <input
-                  className="input-field"
-                  type="number"
-                  min="0"
-                  value={form.kilosMensuales}
-                  onChange={(e) => set('kilosMensuales', e.target.value)}
-                  placeholder="Ej: 500"
-                />
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Kilos mensuales</label>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={form.kilosMensuales}
+                    onChange={(e) => set('kilosMensuales', e.target.value)}
+                    placeholder="Ej: 500"
+                  />
+                </div>
+                <div>
+                  <label className="label">Fecha estimada de cierre</label>
+                  <input
+                    className="input-field"
+                    type="date"
+                    value={form.fechaCierre}
+                    onChange={(e) => set('fechaCierre', e.target.value)}
+                  />
+                </div>
               </div>
               <div>
-                <label className="label">Fecha estimada de cierre</label>
-                <input
-                  className="input-field"
-                  type="date"
-                  value={form.fechaCierre}
-                  onChange={(e) => set('fechaCierre', e.target.value)}
-                />
+                <label className="label">Lista de precios</label>
+                <select className="select-field" value={form.listaPrecios} onChange={(e) => set('listaPrecios', e.target.value)}>
+                  <option value="">— Seleccionar —</option>
+                  {LISTAS_PRECIO.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
               </div>
-            </div>
+            </>
           )}
 
           {/* Observaciones */}

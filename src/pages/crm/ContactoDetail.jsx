@@ -8,8 +8,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
 import {
   CONTACTO_STAGES, CONTACTO_PIPELINE, NOTE_TYPES, TIPO_CLIENTE_COLORS,
-  TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, RESPONSABLES,
+  TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, LISTAS_PRECIO,
 } from '../../utils/crmConstants'
+import { getResponsables, getCamposFaltantesParaGanado } from '../../utils/crmHelpers'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
 
@@ -278,6 +279,8 @@ export default function ContactoDetail() {
   }, [id])
 
   const handleStageChange = async (newStage) => {
+    if (newStage === 'ganado') return handleGanado()
+    if (newStage === 'perdido') return handlePerdido()
     await updateLead(id, { estadoContacto: newStage })
     setContacto((c) => ({ ...c, estadoContacto: newStage }))
     toast.success(`Etapa: "${CONTACTO_STAGES[newStage]?.label}"`)
@@ -289,6 +292,11 @@ export default function ContactoDetail() {
   }
 
   const handleGanado = async () => {
+    const faltantes = getCamposFaltantesParaGanado(contacto)
+    if (faltantes.length > 0) {
+      toast.error(`Faltan datos para marcar Ganado: ${faltantes.join(', ')}`)
+      return
+    }
     const hoy = new Date()
     const nextDate = new Date(hoy)
     nextDate.setDate(nextDate.getDate() + 45)
@@ -523,6 +531,16 @@ export default function ContactoDetail() {
             </div>
 
             <div className="py-2">
+              <p className="text-xs text-brand-text-muted mb-1">Lista de precios</p>
+              <InlineSelect
+                value={contacto.listaPrecios}
+                options={LISTAS_PRECIO}
+                onChange={(v) => handleSave('listaPrecios', v)}
+                placeholder="Sin lista"
+              />
+            </div>
+
+            <div className="py-2">
               <p className="text-xs text-brand-text-muted mb-1">Fecha estimada de cierre</p>
               <InlineDate value={contacto.fechaCierre} onChange={(v) => handleSave('fechaCierre', v)} placeholder="—" />
             </div>
@@ -541,13 +559,11 @@ export default function ContactoDetail() {
             </div>
 
             <div className="py-2">
-              <p className="text-xs text-brand-text-muted mb-1">Responsable</p>
-              <InlineSelect
-                value={contacto.responsable}
-                options={RESPONSABLES}
-                onChange={(v) => handleSave('responsable', v)}
-                placeholder="Sin responsable"
-              />
+              <p className="text-xs text-brand-text-muted mb-1">Responsable(s)</p>
+              {getResponsables(contacto).length > 0
+                ? <p className="text-sm font-medium text-brand-text">{getResponsables(contacto).join(', ')}</p>
+                : <p className="text-sm text-brand-text-light italic">Sin responsable — usar ✏️ Editar</p>
+              }
             </div>
 
             <div className="py-2">

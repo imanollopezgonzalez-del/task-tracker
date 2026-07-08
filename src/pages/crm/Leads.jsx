@@ -4,6 +4,7 @@ import { Plus, Search, ChevronDown, ChevronRight, ChevronUp, Phone, User } from 
 import { useAuth } from '../../contexts/AuthContext'
 import { subscribeLeads } from '../../services/leads'
 import { LEAD_STAGES, TIPOS_CLIENTE, PRODUCTOS, GRUPOS_LISTA, ORIGENES_CONTACTO, RESPONSABLES } from '../../utils/crmConstants'
+import { getResponsables } from '../../utils/crmHelpers'
 import LeadForm from '../../components/crm/LeadForm'
 
 function StageBadge({ estado }) {
@@ -47,7 +48,7 @@ function LeadRow({ lead, onClick }) {
           </span>
         )}
       </td>
-      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{lead.responsable || '—'}</td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{getResponsables(lead).join(', ') || '—'}</td>
     </tr>
   )
 }
@@ -143,7 +144,7 @@ export default function Leads() {
           !emailContacto.toLowerCase().includes(search.toLowerCase())) return false
       if (filterTipo && l.tipoCliente !== filterTipo) return false
       if (filterProducto && l.producto !== filterProducto) return false
-      if (filterResponsable && l.responsable !== filterResponsable) return false
+      if (filterResponsable && !getResponsables(l).includes(filterResponsable)) return false
       return true
     })
   }, [leads, search, filterTipo, filterProducto, filterResponsable])
@@ -158,9 +159,13 @@ export default function Leads() {
     return [...filtered].sort((a, b) => {
       let va = sortKey === 'contacto'
         ? (a.contactos?.[0]?.nombre || a.personaContacto || '')
+        : sortKey === 'responsable'
+        ? getResponsables(a).join(', ')
         : (a[sortKey] || '')
       let vb = sortKey === 'contacto'
         ? (b.contactos?.[0]?.nombre || b.personaContacto || '')
+        : sortKey === 'responsable'
+        ? getResponsables(b).join(', ')
         : (b[sortKey] || '')
       if (typeof va === 'string') va = va.toLowerCase()
       if (typeof vb === 'string') vb = vb.toLowerCase()

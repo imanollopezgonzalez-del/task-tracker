@@ -60,5 +60,11 @@ service cloud.firestore {
         allow delete: if hasCrm() && (uid() == resource.data.autorId || myData().role == 'admin');
       }
     }
+
+    // CRM - Ajustes (objetivos de kg por mes/producto) - solo admin escribe
+    match /crmSettings/{companyId} {
+      allow read: if hasCrm() && myCompany() == companyId;
+      allow write: if hasCrm() && myData().role == 'admin' && myCompany() == companyId;
+    }
   }
 }

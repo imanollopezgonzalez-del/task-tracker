@@ -6,6 +6,7 @@ import { useUsers } from '../../hooks/useUsers'
 import { subscribeLeads, updateLead } from '../../services/leads'
 import { createSeguimientoTask } from '../../services/tasks'
 import { TIPOS_CLIENTE, PRODUCTOS, RESPONSABLES, TIPO_CLIENTE_COLORS } from '../../utils/crmConstants'
+import { getResponsables } from '../../utils/crmHelpers'
 
 const currentYear = new Date().getFullYear()
 
@@ -23,6 +24,11 @@ function getSeguimientoStatus(c) {
 function fmtFecha(str) {
   if (!str) return '—'
   return new Date(str + 'T12:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function fmtFechaHora(timestamp) {
+  if (!timestamp?.toDate) return '—'
+  return timestamp.toDate().toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────
@@ -78,15 +84,17 @@ function TableRow({ c, onClick }) {
       <td className="py-2.5 px-4"><TipoBadge tipo={c.tipoCliente} /></td>
       <td className="py-2.5 px-4"><ProductoBadge producto={c.producto} /></td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.kilosMensuales ? `${c.kilosMensuales} kg` : '—'}</td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.listaPrecios || '—'}</td>
       <td className="py-2.5 px-4"><SeguimientoBadge status={seg} /></td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{primerContacto?.nombre || c.personaContacto || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{primerContacto?.puesto || c.puesto || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{primerContacto?.telefono || c.telefono || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted truncate max-w-[140px]">{primerEmail || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.ubicacion || '—'}</td>
-      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.responsable || '—'}</td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{getResponsables(c).join(', ') || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.origenContacto || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted whitespace-nowrap">{fmtFecha(c.fechaCierre)}</td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted whitespace-nowrap">{fmtFechaHora(c.updatedAt)}</td>
     </tr>
   )
 }
@@ -97,7 +105,7 @@ function GroupHeaderRow({ title, count, open, onToggle, color }) {
       className="border-b border-t border-brand-border cursor-pointer hover:bg-brand-bg-2 transition-colors"
       onClick={onToggle}
     >
-      <td colSpan={13} className="px-4 py-2">
+      <td colSpan={15} className="px-4 py-2">
         <div className="flex items-center gap-2">
           {open
             ? <ChevronDown size={13} className="text-brand-text-muted flex-shrink-0" />
@@ -141,7 +149,7 @@ export default function Clientes() {
       if (search && !l.nombre?.toLowerCase().includes(search.toLowerCase())) return false
       if (filterTipo && l.tipoCliente !== filterTipo) return false
       if (filterProducto && l.producto !== filterProducto) return false
-      if (filterResponsable && l.responsable !== filterResponsable) return false
+      if (filterResponsable && !getResponsables(l).includes(filterResponsable)) return false
       return true
     })
   }, [leads, search, filterTipo, filterProducto, filterResponsable])
@@ -168,7 +176,8 @@ export default function Clientes() {
       if (c.seguimientoTaskId) return
       const proxDate = new Date(c.proximoSeguimiento + 'T12:00:00')
       if (proxDate > today) return
-      const responsableUser = users.find((u) => u.displayName === c.responsable)
+      const primerResponsable = getResponsables(c)[0]
+      const responsableUser = users.find((u) => u.displayName === primerResponsable)
       if (!responsableUser) return
       try {
         const tipo = c.clienteEstado === 'perdido' ? 'cliente_perdido' : 'cliente_activo'
@@ -231,13 +240,14 @@ export default function Clientes() {
             <p className="text-xs mt-1">Marcá un contacto como "Ganado" para que aparezca aquí</p>
           </div>
         ) : (
-          <table className="w-full min-w-[1200px]">
+          <table className="w-full min-w-[1450px]">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b-2 border-brand-border">
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Empresa</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Tipo</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Producto</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Kg / mes</th>
+                <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Lista de precios</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Seguimiento</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Persona contacto</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Puesto</th>
@@ -247,6 +257,7 @@ export default function Clientes() {
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Responsable</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Origen</th>
                 <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Fecha de alta</th>
+                <th className="text-left py-2 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Última actualización</th>
               </tr>
             </thead>
             <tbody>

@@ -6,6 +6,7 @@ import { subscribeLeads, updateLead } from '../../services/leads'
 import {
   CONTACTO_STAGES, TIPOS_CLIENTE, PRODUCTOS, RESPONSABLES, TIPO_CLIENTE_COLORS,
 } from '../../utils/crmConstants'
+import { getResponsables, getCamposFaltantesParaGanado } from '../../utils/crmHelpers'
 import toast from 'react-hot-toast'
 
 const ALL_STAGES = Object.keys(CONTACTO_STAGES)
@@ -126,6 +127,7 @@ function TableRow({ c, onClick }) {
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">
         {c.kilosMensuales ? `${c.kilosMensuales} kg` : '—'}
       </td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.listaPrecios || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.fechaCierre || '—'}</td>
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">
         {primerContacto?.nombre || c.personaContacto || '—'}
@@ -133,7 +135,7 @@ function TableRow({ c, onClick }) {
       <td className="py-2.5 px-4 text-xs text-brand-text-muted">
         {primerContacto?.telefono || c.telefono || '—'}
       </td>
-      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{c.responsable || '—'}</td>
+      <td className="py-2.5 px-4 text-xs text-brand-text-muted">{getResponsables(c).join(', ') || '—'}</td>
     </tr>
   )
 }
@@ -167,7 +169,7 @@ export default function Contactos() {
           !nombre1.toLowerCase().includes(search.toLowerCase())) return false
       if (filterTipo && l.tipoCliente !== filterTipo) return false
       if (filterProducto && l.producto !== filterProducto) return false
-      if (filterResponsable && l.responsable !== filterResponsable) return false
+      if (filterResponsable && !getResponsables(l).includes(filterResponsable)) return false
       return true
     })
   }, [leads, search, filterTipo, filterProducto, filterResponsable])
@@ -214,6 +216,11 @@ export default function Contactos() {
     if (!card || card.estadoContacto === targetStage) return
 
     if (targetStage === 'ganado') {
+      const faltantes = getCamposFaltantesParaGanado(card)
+      if (faltantes.length > 0) {
+        toast.error(`Faltan datos para marcar Ganado: ${faltantes.join(', ')}`)
+        return
+      }
       const hoy = new Date()
       const nextDate = new Date(hoy)
       nextDate.setDate(nextDate.getDate() + 45)
@@ -332,6 +339,7 @@ export default function Contactos() {
                     <SortableTh label="Tipo" sk="tipoCliente" {...sortProps} />
                     <SortableTh label="Producto" sk="producto" {...sortProps} />
                     <SortableTh label="Kg / mes" sk="kilosMensuales" {...sortProps} />
+                    <SortableTh label="Lista de precios" sk="listaPrecios" {...sortProps} />
                     <SortableTh label="Fecha cierre" sk="fechaCierre" {...sortProps} />
                     <SortableTh label="Contacto" sk="contacto" {...sortProps} />
                     <th className="text-left py-1.5 px-4 text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Teléfono</th>

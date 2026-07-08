@@ -8,8 +8,9 @@ import { useAuth } from '../../contexts/AuthContext'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
 import {
   LEAD_STAGES, PIPELINE_STEPS, TIPOS_CLIENTE, PRODUCTOS,
-  ORIGENES_CONTACTO, RESPONSABLES, NOTE_TYPES,
+  ORIGENES_CONTACTO, NOTE_TYPES,
 } from '../../utils/crmConstants'
+import { getResponsables } from '../../utils/crmHelpers'
 import LeadForm from '../../components/crm/LeadForm'
 import toast from 'react-hot-toast'
 
@@ -487,13 +488,11 @@ export default function LeadDetail() {
             </div>
 
             <div className="py-2">
-              <p className="text-xs text-brand-text-muted mb-1">Responsable</p>
-              <InlineSelect
-                value={lead.responsable}
-                options={RESPONSABLES}
-                onChange={(v) => handleSave('responsable', v)}
-                placeholder="Sin responsable"
-              />
+              <p className="text-xs text-brand-text-muted mb-1">Responsable(s)</p>
+              {getResponsables(lead).length > 0
+                ? <p className="text-sm font-medium text-brand-text">{getResponsables(lead).join(', ')}</p>
+                : <p className="text-sm text-brand-text-light italic">Sin responsable — usar ✏️ Editar</p>
+              }
             </div>
 
             <div className="py-2">

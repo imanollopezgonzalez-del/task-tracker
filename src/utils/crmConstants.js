@@ -65,6 +65,14 @@ export const RESPONSABLES = [
   'LUCIANO',
 ]
 
+// Lista de precios aplicada al cliente (independiente del Tipo de cliente)
+export const LISTAS_PRECIO = [
+  'Distribuidor',
+  'Mayorista',
+  'Gastronómica',
+  'Boutique',
+]
+
 // ── Contactos (proceso de ventas) ───────────────────────────────────────────
 export const CONTACTO_STAGES = {
   contactado:        { label: 'Contactado',                   color: 'bg-gray-100 text-gray-600 border-gray-200',     dot: 'bg-gray-400',   kanban: '#94A3B8', order: 1 },
