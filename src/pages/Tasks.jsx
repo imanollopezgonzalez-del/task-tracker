@@ -72,7 +72,8 @@ function filterByView(tasks, view) {
           const days = cfg.days?.length ? cfg.days : [1, 2, 3, 4, 5]
           // Mostrar si hoy es un día programado O si ya pasó (vencida sin completar)
           if (days.includes(now.getDay())) return true
-          return due ? isBefore(due, startOfDay(now)) : false
+          const ref = due || startRef
+          return ref ? isBefore(ref, startOfDay(now)) : false
         }
         if (t.recurrence === 'monthly') {
           const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
