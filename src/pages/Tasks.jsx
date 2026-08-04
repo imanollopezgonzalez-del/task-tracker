@@ -76,16 +76,17 @@ function filterByView(tasks, view) {
           return ref ? isBefore(ref, startOfDay(now)) : false
         }
         if (t.recurrence === 'monthly') {
-          const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
-          // Mostrar si hoy ES el día programado O si ya pasó (vencida sin completar)
+          // Usar la fecha real (dueDate/startDate) como fuente de verdad, no reconstruir
+          // desde recurrenceConfig.dayOfMonth: eso rompía al cruzar de mes (ver histórico)
+          // y también podía desincronizarse si se editó la fecha y la recurrencia por separado.
+          const ref = due || startRef
+          if (ref) return isToday(ref) || isBefore(ref, startOfDay(now))
+          const dom = cfg.dayOfMonth
           return dom ? now.getDate() >= dom : false
         }
         if (t.recurrence === 'annual') {
-          const base = due || start
-          if (!base) return false
-          const sched = new Date(now.getFullYear(), base.getMonth(), base.getDate())
-          // Mostrar si hoy ES la fecha programada O si ya pasó (vencida sin completar)
-          return sched <= startOfDay(now)
+          const ref = due || startRef
+          return ref ? (isToday(ref) || isBefore(ref, startOfDay(now))) : false
         }
         return false
       }
@@ -97,18 +98,17 @@ function filterByView(tasks, view) {
         if (startRef && startRef > wEnd) return false
         if (t.recurrence === 'daily' || t.recurrence === 'weekly') return true
         if (t.recurrence === 'monthly') {
-          const dom = cfg.dayOfMonth || due?.getDate() || start?.getDate()
+          // Misma fuente de verdad que en "Hoy": la fecha real, no la reconstrucción por cfg
+          const ref = due || startRef
+          if (ref) return isThisWeek(ref, { weekStartsOn: 1 }) || isBefore(ref, startOfDay(now))
+          const dom = cfg.dayOfMonth
           if (!dom) return false
           const sched = new Date(now.getFullYear(), now.getMonth(), dom)
-          // Mostrar si cae esta semana O si ya pasó (vencida sin completar)
           return sched <= wEnd
         }
         if (t.recurrence === 'annual') {
-          const base = due || start
-          if (!base) return false
-          const sched = new Date(now.getFullYear(), base.getMonth(), base.getDate())
-          // Mostrar si cae esta semana O si ya pasó (vencida sin completar)
-          return sched <= wEnd
+          const ref = due || startRef
+          return ref ? (isThisWeek(ref, { weekStartsOn: 1 }) || isBefore(ref, startOfDay(now))) : false
         }
         return false
       }
@@ -122,7 +122,9 @@ function filterByView(tasks, view) {
         }
         if (t.recurrence === 'annual') {
           const base = due || start
-          return base ? base.getMonth() === now.getMonth() : false
+          if (!base) return true
+          // Mostrar si el aniversario cae este mes O si sigue vencida de un mes anterior
+          return base.getMonth() === now.getMonth() || isBefore(base, startOfDay(now))
         }
         return true
       }
