@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, LayoutGrid, List, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, LayoutGrid, List, ChevronUp, ChevronDown, GripVertical } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { subscribeLeads, updateLead } from '../../services/leads'
 import {
@@ -10,6 +10,27 @@ import { getResponsables, getCamposFaltantesParaGanado } from '../../utils/crmHe
 import toast from 'react-hot-toast'
 
 const ALL_STAGES = Object.keys(CONTACTO_STAGES)
+
+function applyOrder(items, order) {
+  if (!order.length) return items
+  const map = Object.fromEntries(items.map((c) => [c.id, c]))
+  const ordered = order.filter((id) => map[id]).map((id) => map[id])
+  const fresh = items.filter((c) => !order.includes(c.id))
+  return [...ordered, ...fresh]
+}
+
+function loadOrder(companyId, stageKey) {
+  try {
+    const raw = localStorage.getItem(`contactoOrder_${companyId}_${stageKey}`)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+
+function saveOrder(companyId, stageKey, order) {
+  try {
+    localStorage.setItem(`contactoOrder_${companyId}_${stageKey}`, JSON.stringify(order))
+  } catch {}
+}
 
 function TipoBadge({ tipo }) {
   if (!tipo) return null
@@ -34,14 +55,27 @@ function ProductoBadge({ producto }) {
 
 // ── Kanban ────────────────────────────────────────────────────────────────────
 
-function KanbanCard({ c, onClick }) {
+function KanbanCard({ c, onClick, onReorderDragStart, onReorderDragEnter, onReorderDrop }) {
+  const [dragging, setDragging] = useState(false)
   return (
     <div
       draggable
-      onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData('text/plain', c.id) }}
+      onDragStart={(e) => {
+        e.stopPropagation()
+        setDragging(true)
+        e.dataTransfer.setData('text/plain', c.id)
+        onReorderDragStart(c.id)
+      }}
+      onDragEnd={() => setDragging(false)}
+      onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); onReorderDragEnter(c.id) }}
+      onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+      onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onReorderDrop() }}
       onClick={onClick}
-      className="bg-white rounded-xl border border-brand-border p-3 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-orange/40 transition-all"
+      className={`bg-white rounded-xl border border-brand-border p-3 pl-6 cursor-grab active:cursor-grabbing hover:shadow-md hover:border-brand-orange/40 transition-all relative group ${dragging ? 'opacity-40 scale-95' : ''}`}
     >
+      <div className="absolute left-1.5 top-1/2 -translate-y-1/2 text-brand-text-muted opacity-0 group-hover:opacity-40 select-none">
+        <GripVertical size={14} />
+      </div>
       <h4 className="text-sm font-semibold text-brand-text mb-2 leading-tight">{c.nombre}</h4>
       <div className="flex flex-wrap gap-1 mb-1.5">
         <TipoBadge tipo={c.tipoCliente} />
@@ -54,7 +88,7 @@ function KanbanCard({ c, onClick }) {
   )
 }
 
-function KanbanColumn({ stageKey, contactos, onCardClick, onDrop }) {
+function KanbanColumn({ stageKey, contactos, onCardClick, onDrop, onReorderDragStart, onReorderDragEnter, onReorderDrop }) {
   const stage = CONTACTO_STAGES[stageKey]
   const [dragOver, setDragOver] = useState(false)
 
@@ -78,7 +112,12 @@ function KanbanColumn({ stageKey, contactos, onCardClick, onDrop }) {
         onDrop={(e) => { e.preventDefault(); setDragOver(false); onDrop(e, stageKey) }}
       >
         {contactos.map((c) => (
-          <KanbanCard key={c.id} c={c} onClick={() => onCardClick(c.id)} />
+          <KanbanCard
+            key={c.id} c={c} onClick={() => onCardClick(c.id)}
+            onReorderDragStart={(id) => onReorderDragStart(stageKey, id)}
+            onReorderDragEnter={onReorderDragEnter}
+            onReorderDrop={() => onReorderDrop(stageKey)}
+          />
         ))}
       </div>
     </div>
@@ -153,11 +192,22 @@ export default function Contactos() {
   const [filterResponsable, setFilterResponsable] = useState('')
   const [sortKey, setSortKey] = useState('')
   const [sortDir, setSortDir] = useState('asc')
+  const [orders, setOrders] = useState({})
+  const dragSrc = useRef(null)
+  const dragOver = useRef(null)
+  const displayGroupsRef = useRef({})
 
   useEffect(() => {
     if (!userProfile?.companyId) return
     const unsub = subscribeLeads(userProfile.companyId, setLeads)
     return unsub
+  }, [userProfile?.companyId])
+
+  useEffect(() => {
+    if (!userProfile?.companyId) return
+    const next = {}
+    ALL_STAGES.forEach((k) => { next[k] = loadOrder(userProfile.companyId, k) })
+    setOrders(next)
   }, [userProfile?.companyId])
 
   const contactos = useMemo(() => {
@@ -206,6 +256,31 @@ export default function Contactos() {
     })
     return map
   }, [contactos])
+
+  const displayGroups = useMemo(() => {
+    const map = {}
+    ALL_STAGES.forEach((k) => { map[k] = applyOrder(kanbanGroups[k] || [], orders[k] || []) })
+    return map
+  }, [kanbanGroups, orders])
+  displayGroupsRef.current = displayGroups
+
+  const reorderStage = (stageKey) => {
+    if (dragSrc.current?.stage !== stageKey) { dragSrc.current = null; dragOver.current = null; return }
+    const src = dragSrc.current.id
+    const over = dragOver.current
+    if (!src || !over || src === over) { dragSrc.current = null; dragOver.current = null; return }
+    const ids = displayGroupsRef.current[stageKey].map((c) => c.id)
+    const fi = ids.indexOf(src)
+    const ti = ids.indexOf(over)
+    if (fi < 0 || ti < 0) { dragSrc.current = null; dragOver.current = null; return }
+    const next = [...ids]
+    next.splice(fi, 1)
+    next.splice(ti, 0, src)
+    setOrders((o) => ({ ...o, [stageKey]: next }))
+    saveOrder(userProfile.companyId, stageKey, next)
+    dragSrc.current = null
+    dragOver.current = null
+  }
 
   const goDetail = (id) => navigate(`/crm/contactos/${id}`)
 
@@ -311,9 +386,12 @@ export default function Contactos() {
                 <KanbanColumn
                   key={key}
                   stageKey={key}
-                  contactos={kanbanGroups[key] || []}
+                  contactos={displayGroups[key] || []}
                   onCardClick={goDetail}
                   onDrop={handleDrop}
+                  onReorderDragStart={(stage, id) => { dragSrc.current = { id, stage } }}
+                  onReorderDragEnter={(id) => { dragOver.current = id }}
+                  onReorderDrop={reorderStage}
                 />
               ))}
             </div>
