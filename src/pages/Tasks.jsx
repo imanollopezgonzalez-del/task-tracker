@@ -256,7 +256,6 @@ export default function Tasks() {
   const [recurringOrder, setRecurringOrder] = useState([])
   const [supervisionOrder, setSupervisionOrder] = useState([])
   const dragSrc = useRef(null)
-  const dragOver = useRef(null)
   const displayRef = useRef({ normal: [], recurring: [], supervision: [] })
 
   useEffect(() => { setNormalOrder([]) }, [normalCol.sort, normalCol.search, normalCol.priority])
@@ -320,23 +319,22 @@ export default function Tasks() {
   const displaySupervision = useMemo(() => applyOrder(filteredSupervision, supervisionOrder), [filteredSupervision, supervisionOrder])
   displayRef.current = { normal: displayNormal, recurring: displayRecurring, supervision: displaySupervision }
 
-  const reorderCol = (col, setOrder) => {
-    if (dragSrc.current?.col !== col) { dragSrc.current = null; dragOver.current = null; return }
-    const src = dragSrc.current.id
-    const over = dragOver.current
-    if (!src || !over || src === over) { dragSrc.current = null; dragOver.current = null; return }
+  // Reordena en vivo mientras se arrastra (al entrar sobre otra tarjeta), no recién al soltar
+  const reorderColLive = (col, setOrder, overId) => {
+    const src = dragSrc.current
+    if (!src || src.col !== col || src.id === overId) return
     const ids = displayRef.current[col].map((t) => t.id)
-    const fi = ids.indexOf(src)
-    const ti = ids.indexOf(over)
-    if (fi < 0 || ti < 0) { dragSrc.current = null; dragOver.current = null; return }
+    const fi = ids.indexOf(src.id)
+    const ti = ids.indexOf(overId)
+    if (fi < 0 || ti < 0 || fi === ti) return
     const next = [...ids]
     next.splice(fi, 1)
-    next.splice(ti, 0, src)
+    next.splice(ti, 0, src.id)
     setOrder(next)
     saveOrder(companyId, viewUid, col, next)
-    dragSrc.current = null
-    dragOver.current = null
   }
+
+  const endDrag = () => { dragSrc.current = null }
 
   const handleEdit = (task) => { setEditTask(task); setShowModal(true) }
   const handleClose = () => { setShowModal(false); setEditTask(null) }
@@ -454,8 +452,8 @@ export default function Tasks() {
                   onComplete={handleComplete}
                   sortable
                   onDragStart={(id) => { dragSrc.current = { id, col: 'normal' } }}
-                  onDragEnter={(id) => { dragOver.current = id }}
-                  onDrop={() => reorderCol('normal', setNormalOrder)}
+                  onDragEnter={(id) => reorderColLive('normal', setNormalOrder, id)}
+                  onDragEnd={endDrag}
                 />
               ))}
             </div>
@@ -475,8 +473,8 @@ export default function Tasks() {
                   onComplete={handleComplete}
                   sortable
                   onDragStart={(id) => { dragSrc.current = { id, col: 'recurring' } }}
-                  onDragEnter={(id) => { dragOver.current = id }}
-                  onDrop={() => reorderCol('recurring', setRecurringOrder)}
+                  onDragEnter={(id) => reorderColLive('recurring', setRecurringOrder, id)}
+                  onDragEnd={endDrag}
                 />
               ))}
             </div>
@@ -497,8 +495,8 @@ export default function Tasks() {
                   onVerify={task.status === 'pending_response' ? handleVerify : undefined}
                   sortable
                   onDragStart={(id) => { dragSrc.current = { id, col: 'supervision' } }}
-                  onDragEnter={(id) => { dragOver.current = id }}
-                  onDrop={() => reorderCol('supervision', setSupervisionOrder)}
+                  onDragEnter={(id) => reorderColLive('supervision', setSupervisionOrder, id)}
+                  onDragEnd={endDrag}
                 />
               ))}
             </div>

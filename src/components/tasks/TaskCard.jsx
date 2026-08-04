@@ -6,6 +6,7 @@ import Avatar from '../ui/Avatar'
 import { formatRelative, isOverdue, isDueSoon } from '../../utils/dates'
 import { RECURRENCES } from '../../utils/constants'
 import { Calendar, RefreshCw, AlertCircle, CheckCircle2, GripVertical, Pencil } from 'lucide-react'
+import { setDragGhost } from '../../utils/dragGhost'
 
 const tsToDate = (v) => v?.toDate ? v.toDate() : v ? new Date(v) : null
 
@@ -38,7 +39,7 @@ function getRecurrencePattern(task) {
 
 export default function TaskCard({
   task, users = [], onEdit, onComplete, onVerify, compact = false,
-  sortable = false, onDragStart, onDragEnter, onDrop,
+  sortable = false, onDragStart, onDragEnter, onDragEnd,
 }) {
   const [dragging, setDragging] = useState(false)
   const assignee = users.find((u) => u.uid === task.assignedTo)
@@ -54,11 +55,11 @@ export default function TaskCard({
   return (
     <div
       draggable={sortable}
-      onDragStart={sortable ? (e) => { e.stopPropagation(); setDragging(true); onDragStart?.(task.id) } : undefined}
-      onDragEnd={sortable ? () => setDragging(false) : undefined}
+      onDragStart={sortable ? (e) => { e.stopPropagation(); setDragging(true); setDragGhost(e, task.title); onDragStart?.(task.id) } : undefined}
+      onDragEnd={sortable ? () => { setDragging(false); onDragEnd?.() } : undefined}
       onDragEnter={sortable ? (e) => { e.preventDefault(); onDragEnter?.(task.id) } : undefined}
       onDragOver={sortable ? (e) => e.preventDefault() : undefined}
-      onDrop={sortable ? (e) => { e.preventDefault(); onDrop?.() } : undefined}
+      onDrop={sortable ? (e) => e.preventDefault() : undefined}
       className={[
         'rounded-xl border shadow-card hover:shadow-card-hover transition-all duration-200 group relative',
         overdue && !isDone
