@@ -1,65 +1,48 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { buildUserEmail } from '../services/users'
-import toast from 'react-hot-toast'
-import { Eye, EyeOff, CheckSquare, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import Spinner from '../components/ui/Spinner'
 
+function GoogleIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" {...props}>
+      <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.77-2.4 3.62v3.01h3.88c2.27-2.09 3.57-5.17 3.57-8.82z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3.01c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.11C3.25 21.3 7.31 24 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 014.9 12c0-.79.14-1.56.37-2.28V6.61H1.27A11.98 11.98 0 000 12c0 1.94.46 3.77 1.27 5.39l4-3.11z" />
+      <path fill="#EA4335" d="M12 4.77c1.76 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.7 1.27 6.61l4 3.11C6.22 6.88 8.87 4.77 12 4.77z" />
+    </svg>
+  )
+}
+
 export default function Login() {
-  const [tab, setTab] = useState('login')
-  const [showPwd, setShowPwd] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
-  const [username, setUsername] = useState('')
-  const [pin, setPin] = useState('')
-  const [companyCode, setCompanyCode] = useState('')
 
-  const { login, register } = useAuth()
+  const { loginWithGoogle } = useAuth()
   const navigate = useNavigate()
-
-  const clear = () => setError('')
 
   const getErrorMsg = (code, message) => {
     switch (code) {
-      case 'auth/invalid-credential':
-      case 'auth/wrong-password':
-      case 'auth/user-not-found': return 'Usuario o PIN incorrecto'
-      case 'auth/too-many-requests': return 'Demasiados intentos. Espera unos minutos.'
-      case 'auth/email-already-in-use': return 'Ese nombre ya existe. Elige otro.'
+      case 'auth/popup-closed-by-user':
+      case 'auth/cancelled-popup-request': return ''
       case 'auth/network-request-failed': return 'Sin conexión. Revisa tu internet.'
+      case 'auth/too-many-requests': return 'Demasiados intentos. Espera unos minutos.'
+      case 'auth/google-not-authorized': return message
       default: return message || 'Algo salió mal. Inténtalo de nuevo.'
     }
   }
 
-  const handleLogin = async (e) => {
-    e.preventDefault()
-    clear()
-    if (!username.trim()) { setError('Escribe tu nombre de usuario'); return }
-    if (pin.length !== 6) { setError('El PIN debe tener 6 dígitos'); return }
-    setLoading(true)
+  const handleGoogleLogin = async () => {
+    setError('')
+    setGoogleLoading(true)
     try {
-      await login(buildUserEmail(username), pin)
+      await loginWithGoogle()
       navigate('/')
     } catch (err) {
-      setError(getErrorMsg(err.code, err.message))
-    } finally { setLoading(false) }
-  }
-
-  const handleRegister = async (e) => {
-    e.preventDefault()
-    clear()
-    if (!username.trim()) { setError('Escribe tu nombre'); return }
-    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setError('El PIN debe ser exactamente 6 dígitos numéricos'); return }
-    setLoading(true)
-    try {
-      // AuthContext maneja todo: crear usuario, empresa y rol correcto
-      await register(buildUserEmail(username), pin, username, companyCode.trim() || null)
-      navigate('/')
-      toast.success(`¡Bienvenido, ${username}!`)
-    } catch (err) {
-      setError(getErrorMsg(err.code, err.message))
-    } finally { setLoading(false) }
+      const msg = getErrorMsg(err.code, err.message)
+      if (msg) setError(msg)
+    } finally { setGoogleLoading(false) }
   }
 
   return (
@@ -74,15 +57,6 @@ export default function Login() {
         </div>
 
         <div className="card p-6">
-          <div className="flex gap-1 bg-brand-bg-2 p-1 rounded-lg mb-5">
-            {['login', 'register'].map((t) => (
-              <button key={t} type="button" onClick={() => { setTab(t); clear(); setPin('') }}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${tab === t ? 'bg-white shadow-card text-brand-text' : 'text-brand-text-muted hover:text-brand-text'}`}>
-                {t === 'login' ? 'Entrar' : 'Registrarse'}
-              </button>
-            ))}
-          </div>
-
           {error && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-3 py-2.5 mb-4">
               <AlertCircle size={15} className="flex-shrink-0" />
@@ -90,60 +64,14 @@ export default function Login() {
             </div>
           )}
 
-          {tab === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <label className="label">Nombre de usuario</label>
-                <input type="text" autoComplete="username" className="input-field" placeholder="Ej: Imanol"
-                  value={username} onChange={(e) => { clear(); setUsername(e.target.value) }} />
-              </div>
-              <div>
-                <label className="label">PIN <span className="normal-case font-normal text-brand-text-light">(6 dígitos)</span></label>
-                <div className="relative">
-                  <input type={showPwd ? 'text' : 'password'} inputMode="numeric" maxLength={6}
-                    className="input-field pr-10 tracking-widest text-xl text-center" placeholder="······"
-                    value={pin} onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }} />
-                  <button type="button" onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-brand-text">
-                    {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">
-                {loading ? <Spinner size="sm" /> : 'Entrar'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div>
-                <label className="label">Tu nombre</label>
-                <input type="text" required autoComplete="name" className="input-field" placeholder="Ej: Ivan"
-                  value={username} onChange={(e) => { clear(); setUsername(e.target.value) }} />
-              </div>
-              <div>
-                <label className="label">PIN <span className="normal-case font-normal text-brand-text-light">(6 dígitos)</span></label>
-                <div className="relative">
-                  <input type={showPwd ? 'text' : 'password'} inputMode="numeric" maxLength={6}
-                    className="input-field pr-10 tracking-widest text-xl text-center" placeholder="······"
-                    value={pin} onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }} />
-                  <button type="button" onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-brand-text">
-                    {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="label">
-                  Código de empresa <span className="normal-case font-normal text-brand-text-light">(te lo da el admin)</span>
-                </label>
-                <input type="text" className="input-field" placeholder="Déjalo vacío si eres el primero"
-                  value={companyCode} onChange={(e) => { clear(); setCompanyCode(e.target.value) }} />
-              </div>
-              <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">
-                {loading ? <Spinner size="sm" /> : 'Crear cuenta'}
-              </button>
-            </form>
-          )}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-lg border border-brand-border bg-white hover:bg-brand-bg-2 transition-colors font-medium text-sm text-brand-text disabled:opacity-60"
+          >
+            {googleLoading ? <Spinner size="sm" /> : <><GoogleIcon /> Continuar con Google</>}
+          </button>
         </div>
         <p className="text-center text-xs text-brand-text-muted mt-4">Doble control · Seguimiento de equipos</p>
       </div>

@@ -19,6 +19,7 @@ import Clientes from './pages/crm/Clientes'
 import ClienteDetail from './pages/crm/ClienteDetail'
 import Panel from './pages/crm/Panel'
 import Mailing from './pages/crm/Mailing'
+import MapaClientes from './pages/crm/MapaClientes'
 import Spinner from './components/ui/Spinner'
 
 function ProtectedRoute({ children }) {
@@ -58,6 +59,7 @@ function AppRoutes() {
       <Route path="/crm/clientes" element={<ProtectedRoute><Clientes /></ProtectedRoute>} />
       <Route path="/crm/clientes/:id" element={<ProtectedRoute><ClienteDetail /></ProtectedRoute>} />
       <Route path="/crm/panel" element={<ProtectedRoute><Panel /></ProtectedRoute>} />
+      <Route path="/crm/mapa" element={<ProtectedRoute><MapaClientes /></ProtectedRoute>} />
       <Route path="/crm/mailing" element={<ProtectedRoute><Mailing /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/tasks" replace />} />
     </Routes>

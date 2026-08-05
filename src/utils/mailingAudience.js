@@ -60,3 +60,11 @@ export function resolveRecipient(record) {
   const nombre = primerContacto?.nombre || record.personaContacto || ''
   return { email, nombre, empresa: record.nombre || '', leadId: record.id }
 }
+
+// Excluye del envío masivo a quien se dio de baja (Fase 2 de mailing). unsubscribedEmails
+// es el Set que devuelve subscribeUnsubscribedEmails, con emails ya en minúscula.
+export function excludeUnsubscribed(recipients, unsubscribedEmails) {
+  if (!unsubscribedEmails?.size) return { recipients, excluidos: 0 }
+  const filtered = recipients.filter((r) => !unsubscribedEmails.has(r.email.toLowerCase()))
+  return { recipients: filtered, excluidos: recipients.length - filtered.length }
+}

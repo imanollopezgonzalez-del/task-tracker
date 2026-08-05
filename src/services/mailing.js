@@ -7,6 +7,7 @@ const MAILING_SETTINGS_COL = 'mailingSettings'
 const MAILING_LOGS_COL = 'mailingLogs'
 const MAIL_TEMPLATES_COL = 'mailTemplates'
 const MAIL_CAMPAIGNS_COL = 'mailCampaigns'
+const MAILING_UNSUBSCRIBES_COL = 'mailingUnsubscribes'
 
 export const subscribeConnectedAccounts = (companyId, callback) => {
   const settingsRef = doc(db, MAILING_SETTINGS_COL, companyId)
@@ -114,6 +115,17 @@ export const subscribeMailCampaigns = (companyId, callback) => {
     q,
     (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (err) => console.error('subscribeMailCampaigns error:', err)
+  )
+}
+
+// Set de emails (en minúscula) que se dieron de baja de envíos masivos para esta empresa —
+// usado para excluirlos del conteo/lista antes de enviar (ver mailingAudience.js).
+export const subscribeUnsubscribedEmails = (companyId, callback) => {
+  const q = query(collection(db, MAILING_UNSUBSCRIBES_COL), where('companyId', '==', companyId))
+  return onSnapshot(
+    q,
+    (snap) => callback(new Set(snap.docs.map((d) => d.data().email))),
+    (err) => console.error('subscribeUnsubscribedEmails error:', err)
   )
 }
 

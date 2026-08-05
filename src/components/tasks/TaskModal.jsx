@@ -48,7 +48,7 @@ export default function TaskModal({ isOpen, onClose, task, users = [] }) {
         observation: '',
       })
     } else {
-      setForm({ ...EMPTY, assignedTo: currentUser?.uid || '', startDate: new Date().toISOString().split('T')[0] })
+      setForm({ ...EMPTY, assignedTo: currentUser?.uid || '', startDate: toInputDate(new Date()) })
     }
   }, [task, isOpen, currentUser])
 

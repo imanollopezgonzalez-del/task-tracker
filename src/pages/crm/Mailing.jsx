@@ -220,6 +220,8 @@ export default function Mailing() {
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Asunto</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Destinatarios</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Entregado</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Abierto</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Click</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Falló</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Estado</th>
                   </tr>
@@ -228,6 +230,9 @@ export default function Mailing() {
                   {sortedCampaigns.map((c) => {
                     const date = c.createdAt?.toDate ? c.createdAt.toDate() : null
                     const pct = (n) => c.recipientCount ? Math.round((n / c.recipientCount) * 100) : 0
+                    // Abierto/Click son % sobre lo que efectivamente se entregó, no sobre el total
+                    // de destinatarios (que incluye fallos que nunca pudieron abrirse).
+                    const pctOfSent = (n) => c.sentCount ? Math.round((n / c.sentCount) * 100) : 0
                     return (
                       <tr key={c.id} onClick={() => setSelectedCampaign(c)} className="border-b border-brand-border last:border-0 hover:bg-brand-bg-2 cursor-pointer">
                         <td className="px-3 py-2 text-xs text-brand-text-muted whitespace-nowrap">
@@ -236,6 +241,8 @@ export default function Mailing() {
                         <td className="px-3 py-2 text-xs text-brand-text truncate max-w-[220px]">{c.subject}</td>
                         <td className="px-3 py-2 text-xs text-brand-text-muted">{c.recipientCount}</td>
                         <td className="px-3 py-2 text-xs text-green-700 font-medium">{pct(c.sentCount)}%</td>
+                        <td className="px-3 py-2 text-xs text-blue-600 font-medium">{pctOfSent(c.openedCount || 0)}%</td>
+                        <td className="px-3 py-2 text-xs text-purple-600 font-medium">{pctOfSent(c.clickedCount || 0)}%</td>
                         <td className="px-3 py-2 text-xs text-red-600 font-medium">{pct(c.failedCount)}%</td>
                         <td className="px-3 py-2 text-xs">
                           {c.status === 'done' ? (

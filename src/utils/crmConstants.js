@@ -101,4 +101,5 @@ export const TIPO_CLIENTE_COLORS = {
 export const NOTE_TYPES = {
   nota: { label: 'Nota', color: 'bg-brand-bg-2 border-brand-border' },
   importante: { label: 'Importante', color: 'bg-orange-50 border-orange-200' },
+  seguimiento: { label: 'Seguimiento', color: 'bg-blue-50 border-blue-200' },
 }

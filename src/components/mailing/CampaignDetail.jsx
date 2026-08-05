@@ -5,7 +5,7 @@ import { es } from 'date-fns/locale'
 import { subscribeCampaignLogs } from '../../services/mailing'
 import { isCampaignStuck } from '../../utils/mailingCampaign'
 
-function LogGroup({ title, logs, color }) {
+function LogGroup({ title, logs, color, showTracking }) {
   const [open, setOpen] = useState(false)
   if (logs.length === 0) return null
   return (
@@ -18,7 +18,15 @@ function LogGroup({ title, logs, color }) {
       {open && (
         <ul className="pb-2">
           {logs.map((log) => (
-            <li key={log.id} className="px-10 py-1 text-xs text-brand-text-muted truncate">{log.to}</li>
+            <li key={log.id} className="px-10 py-1 text-xs text-brand-text-muted flex items-center gap-2">
+              <span className="truncate flex-1">{log.to}</span>
+              {showTracking && (
+                <span className="flex-shrink-0 flex items-center gap-1.5">
+                  {log.openCount > 0 && <span className="text-blue-600" title={`${log.openCount} apertura(s)`}>Abrió</span>}
+                  {log.clickCount > 0 && <span className="text-purple-600" title={`${log.clickCount} click(s)`}>Click</span>}
+                </span>
+              )}
+            </li>
           ))}
         </ul>
       )}
@@ -36,9 +44,11 @@ export default function CampaignDetail({ campaign, onClose }) {
 
   const sent = logs.filter((l) => l.status === 'sent')
   const failed = logs.filter((l) => l.status === 'error')
+  const skipped = logs.filter((l) => l.status === 'skipped')
   const date = campaign.createdAt?.toDate ? campaign.createdAt.toDate() : null
 
   const pct = (n) => campaign.recipientCount ? Math.round((n / campaign.recipientCount) * 100) : 0
+  const pctOfSent = (n) => campaign.sentCount ? Math.round((n / campaign.sentCount) * 100) : 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in">
@@ -50,7 +60,7 @@ export default function CampaignDetail({ campaign, onClose }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 px-6 py-4 border-b border-brand-border">
+        <div className="grid grid-cols-5 gap-2 px-6 py-4 border-b border-brand-border">
           <div>
             <p className="text-[10px] uppercase tracking-wide text-brand-text-muted">Destinatarios</p>
             <p className="text-lg font-bold text-brand-text">{campaign.recipientCount}</p>
@@ -58,6 +68,14 @@ export default function CampaignDetail({ campaign, onClose }) {
           <div>
             <p className="text-[10px] uppercase tracking-wide text-brand-text-muted">Entregado</p>
             <p className="text-lg font-bold text-green-600">{pct(campaign.sentCount)}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-brand-text-muted">Abierto</p>
+            <p className="text-lg font-bold text-blue-600">{pctOfSent(campaign.openedCount || 0)}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-brand-text-muted">Click</p>
+            <p className="text-lg font-bold text-purple-600">{pctOfSent(campaign.clickedCount || 0)}%</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wide text-brand-text-muted">Falló</p>
@@ -80,8 +98,9 @@ export default function CampaignDetail({ campaign, onClose }) {
         </div>
 
         <div className="overflow-y-auto flex-1">
-          <LogGroup title="Se envió con éxito" logs={sent} color="#16A34A" />
+          <LogGroup title="Se envió con éxito" logs={sent} color="#16A34A" showTracking />
           <LogGroup title="No se pudo enviar" logs={failed} color="#DC2626" />
+          <LogGroup title="Dado de baja (no se envió)" logs={skipped} color="#94A3B8" />
         </div>
       </div>
     </div>

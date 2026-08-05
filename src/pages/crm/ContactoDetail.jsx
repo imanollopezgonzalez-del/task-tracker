@@ -11,6 +11,7 @@ import {
   TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, LISTAS_PRECIO,
 } from '../../utils/crmConstants'
 import { getResponsables, getCamposFaltantesParaGanado } from '../../utils/crmHelpers'
+import { toInputDate } from '../../utils/dates'
 import LeadForm from '../../components/crm/LeadForm'
 import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
 import toast from 'react-hot-toast'
@@ -302,7 +303,7 @@ export default function ContactoDetail() {
     const hoy = new Date()
     const nextDate = new Date(hoy)
     nextDate.setDate(nextDate.getDate() + 45)
-    const fmt = (d) => d.toISOString().split('T')[0]
+    const fmt = toInputDate
     await updateLead(id, {
       registroTipo: 'cliente',
       estadoContacto: 'ganado',

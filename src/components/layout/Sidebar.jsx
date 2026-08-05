@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X, Mail, UserPlus, Contact, Briefcase, TrendingUp } from 'lucide-react'
+import { CheckSquare, BarChart3, Users, Settings, LogOut, Calendar, Menu, X, Mail, UserPlus, Contact, Briefcase, TrendingUp, Map } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useState } from 'react'
 import Avatar from '../ui/Avatar'
@@ -24,6 +24,7 @@ const CRM_NAV = [
   { to: '/crm/leads', icon: UserPlus, label: 'Leads' },
   { to: '/crm/contactos', icon: Contact, label: 'Contactos' },
   { to: '/crm/clientes', icon: Briefcase, label: 'Clientes' },
+  { to: '/crm/mapa', icon: Map, label: 'Mapa' },
   { to: '/crm/panel', icon: TrendingUp, label: 'Panel de ventas' },
 ]
 

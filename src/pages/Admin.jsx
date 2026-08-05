@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useUsers } from '../hooks/useUsers'
-import { updateUserProfile, getCompany } from '../services/users'
+import {
+  updateUserProfile, getCompany,
+  subscribeUsuariosAutorizados, addUsuarioAutorizado, removeUsuarioAutorizado,
+} from '../services/users'
 import { db } from '../firebase'
 import { doc, deleteDoc } from 'firebase/firestore'
 import Header from '../components/layout/Header'
 import Avatar from '../components/ui/Avatar'
 import { useTasks } from '../contexts/TaskContext'
-import { Copy, Check, ShieldCheck, User, Trash2, AlertTriangle } from 'lucide-react'
+import { Copy, Check, ShieldCheck, User, Trash2, AlertTriangle, Mail, Plus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../components/ui/Modal'
 import Spinner from '../components/ui/Spinner'
@@ -21,10 +24,40 @@ export default function Admin() {
   const [deleteTarget, setDeleteTarget] = useState(null) // user to delete
   const [deleteStep, setDeleteStep] = useState(0) // 0=closed, 1=first confirm, 2=second confirm
   const [deleting, setDeleting] = useState(false)
+  const [autorizados, setAutorizados] = useState([])
+  const [nuevoEmail, setNuevoEmail] = useState('')
+  const [nuevoRole, setNuevoRole] = useState('member')
+  const [nuevoCrm, setNuevoCrm] = useState(false)
+  const [savingAutorizado, setSavingAutorizado] = useState(false)
 
   useEffect(() => {
     if (userProfile?.companyId) getCompany(userProfile.companyId).then(setCompany)
   }, [userProfile])
+
+  useEffect(() => {
+    if (!userProfile?.companyId) return
+    return subscribeUsuariosAutorizados(userProfile.companyId, setAutorizados)
+  }, [userProfile?.companyId])
+
+  const handleAddAutorizado = async (e) => {
+    e.preventDefault()
+    const email = nuevoEmail.trim().toLowerCase()
+    if (!email || !email.includes('@')) return toast.error('Escribí un email válido')
+    setSavingAutorizado(true)
+    try {
+      await addUsuarioAutorizado(email, { companyId: userProfile.companyId, role: nuevoRole, crmAccess: nuevoCrm })
+      toast.success(`${email} ya puede entrar con Google`)
+      setNuevoEmail(''); setNuevoRole('member'); setNuevoCrm(false)
+    } catch {
+      toast.error('Error al autorizar el email')
+    } finally { setSavingAutorizado(false) }
+  }
+
+  const handleRemoveAutorizado = async (email) => {
+    if (!window.confirm(`¿Quitar el acceso de ${email}?`)) return
+    await removeUsuarioAutorizado(email)
+    toast.success('Acceso revocado')
+  }
 
   if (userProfile?.role !== 'admin') return (
     <div className="p-6 text-center">
@@ -125,6 +158,49 @@ export default function Admin() {
               )
             })}
           </div>
+        </div>
+
+        {/* Acceso con Google */}
+        <div className="card p-5">
+          <h3 className="text-sm font-semibold text-brand-text mb-1">Acceso con Google</h3>
+          <p className="text-xs text-brand-text-muted mb-3">
+            Autorizá un email de Google para que esa persona pueda entrar (sin usuario ni PIN). Si ya es parte del equipo, se lo asigna directo a tu empresa la primera vez que inicie sesión.
+          </p>
+
+          <form onSubmit={handleAddAutorizado} className="flex flex-col sm:flex-row gap-2 mb-4">
+            <input
+              type="email" required placeholder="nombre@gmail.com"
+              className="input-field flex-1 text-sm"
+              value={nuevoEmail} onChange={(e) => setNuevoEmail(e.target.value)}
+            />
+            <select value={nuevoRole} onChange={(e) => setNuevoRole(e.target.value)}
+              className="input-field text-sm sm:w-32">
+              <option value="member">Colaborador</option>
+              <option value="admin">Admin</option>
+            </select>
+            <label className="flex items-center gap-1.5 text-xs text-brand-text-muted whitespace-nowrap px-1">
+              <input type="checkbox" checked={nuevoCrm} onChange={(e) => setNuevoCrm(e.target.checked)} />
+              Acceso CRM
+            </label>
+            <button type="submit" disabled={savingAutorizado} className="btn-primary text-sm px-3 flex-shrink-0">
+              {savingAutorizado ? <Spinner size="sm" /> : <><Plus size={14} /> Autorizar</>}
+            </button>
+          </form>
+
+          {autorizados.length > 0 && (
+            <div className="space-y-1.5">
+              {autorizados.map((a) => (
+                <div key={a.email} className="flex items-center gap-2 p-2 rounded-lg bg-brand-bg text-sm">
+                  <Mail size={13} className="text-brand-text-light flex-shrink-0" />
+                  <span className="flex-1 truncate text-brand-text">{a.email}</span>
+                  <span className="text-xs text-brand-text-muted">{a.role === 'admin' ? 'Admin' : 'Colaborador'}{a.crmAccess ? ' · CRM' : ''}</span>
+                  <button onClick={() => handleRemoveAutorizado(a.email)} className="p-1 rounded text-brand-text-light hover:text-red-500">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

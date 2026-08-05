@@ -11,11 +11,28 @@ import toast from 'react-hot-toast'
 import { Bell, User, Shield, CheckCircle, Copy, Check, AlertTriangle } from 'lucide-react'
 
 export default function Settings() {
-  const { currentUser, userProfile, refreshProfile } = useAuth()
+  const { currentUser, userProfile, refreshProfile, linkGoogleAccount } = useAuth()
   const [pushEnabled, setPushEnabled] = useState(Notification.permission === 'granted')
   const [copied, setCopied] = useState(false)
   const [company, setCompany] = useState(null)
   const [fixingRole, setFixingRole] = useState(false)
+  const [linkingGoogle, setLinkingGoogle] = useState(false)
+
+  const googleLinked = currentUser?.providerData?.some((p) => p.providerId === 'google.com')
+
+  const handleLinkGoogle = async () => {
+    setLinkingGoogle(true)
+    try {
+      await linkGoogleAccount()
+      toast.success('Cuenta de Google vinculada. Ya podés entrar con Google.')
+    } catch (err) {
+      if (err.code === 'auth/credential-already-in-use') {
+        toast.error('Esa cuenta de Google ya está vinculada a otro usuario.')
+      } else if (err.code !== 'auth/popup-closed-by-user') {
+        toast.error('No se pudo vincular la cuenta de Google')
+      }
+    } finally { setLinkingGoogle(false) }
+  }
 
   useEffect(() => {
     if (userProfile?.companyId) getCompany(userProfile.companyId).then(setCompany)
@@ -86,6 +103,26 @@ export default function Settings() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Vincular Google */}
+        <div className="card p-5">
+          <h3 className="text-sm font-semibold text-brand-text mb-1">Login con Google</h3>
+          {googleLinked ? (
+            <div className="flex items-center gap-2 text-sm text-green-700">
+              <CheckCircle size={16} />
+              Vinculada ({currentUser.providerData.find((p) => p.providerId === 'google.com')?.email})
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-brand-text-muted mb-3">
+                Vinculá tu cuenta de Google para poder entrar sin usuario y PIN, sin perder tus tareas ni tu historial.
+              </p>
+              <button onClick={handleLinkGoogle} disabled={linkingGoogle} className="btn-secondary text-sm">
+                {linkingGoogle ? <Spinner size="sm" /> : 'Vincular con Google'}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Código de empresa */}

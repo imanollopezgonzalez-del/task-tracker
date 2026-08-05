@@ -156,10 +156,13 @@ export default function Panel() {
   const [filterAno, setFilterAno] = useState(anoActualStr)
   const [filterMes, setFilterMes] = useState('')
 
-  // Mes/año propios del widget de Objetivo (independientes de los filtros globales,
-  // siempre apuntan a un mes puntual — nunca "Todos")
-  const [objAno, setObjAno] = useState(anoActualStr)
-  const [objMes, setObjMes] = useState(mesActualStr)
+  // Mes/año del widget de Objetivo: siguen a los filtros globales de arriba (para que
+  // "Objetivo de kg mensual" muestre el mismo período que el resto del panel). Como acá
+  // sí hace falta un mes puntual para calcular "cerrado hasta fin de ese mes" (a diferencia
+  // del resto de los widgets, que toleran "Todos"), si el filtro global está en "Todos"
+  // caen al mes/año actual.
+  const objAno = filterAno || anoActualStr
+  const objMes = filterMes || mesActualStr
 
   const anoOptions = useMemo(() => getAnoOptions(), [])
 
@@ -344,20 +347,15 @@ export default function Panel() {
         {/* Objetivo de kg */}
         <div className="card p-4">
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Objetivo de kg mensual</p>
-            <div className="flex items-center gap-2">
-              <select className="select-field h-8 text-xs w-32" value={objMes} onChange={(e) => setObjMes(e.target.value)}>
-                {MESES_NOMBRES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-              <select className="select-field h-8 text-xs w-24" value={objAno} onChange={(e) => setObjAno(e.target.value)}>
-                {anoOptions.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-              {isAdmin && (
-                <button onClick={() => setShowObjetivosModal(true)} className="btn-ghost p-1.5" title="Editar objetivos">
-                  <Settings2 size={15} />
-                </button>
-              )}
+            <div>
+              <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Objetivo de kg mensual</p>
+              <p className="text-xs text-brand-text-light capitalize">{mesLabel}</p>
             </div>
+            {isAdmin && (
+              <button onClick={() => setShowObjetivosModal(true)} className="btn-ghost p-1.5" title="Editar objetivos">
+                <Settings2 size={15} />
+              </button>
+            )}
           </div>
           <div className="space-y-3">
             {PRODUCTOS.map((p) => {

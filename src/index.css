@@ -44,6 +44,21 @@
   .select-field {
     @apply w-full px-3 py-2 bg-white border border-brand-border rounded-lg text-sm text-brand-text focus:outline-none focus:ring-2 focus:ring-brand-orange/30 focus:border-brand-orange transition-colors appearance-none cursor-pointer;
   }
+  .phone-field {
+    @apply w-full px-3 py-2 bg-white border border-brand-border rounded-lg text-sm text-brand-text transition-colors;
+  }
+  .phone-field.PhoneInput--focus {
+    @apply ring-2 ring-brand-orange/30 border-brand-orange;
+  }
+  .phone-field .PhoneInputInput {
+    @apply bg-transparent outline-none border-none text-sm text-brand-text placeholder:text-brand-text-light flex-1 min-w-0;
+  }
+  .phone-field .PhoneInputCountrySelect {
+    @apply text-sm;
+  }
+  .phone-field .PhoneInputCountryIcon {
+    @apply shadow-none;
+  }
   .label {
     @apply block text-xs font-semibold text-brand-text-muted uppercase tracking-wide mb-1.5;
   }

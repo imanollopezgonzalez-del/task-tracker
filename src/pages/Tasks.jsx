@@ -9,9 +9,10 @@ import { isToday, isThisWeek, isThisMonth, isBefore, startOfDay, startOfWeek, en
 import { CheckSquare, Clock, AlertCircle, TrendingUp, RefreshCw, Eye, SlidersHorizontal, ChevronDown, X } from 'lucide-react'
 import Avatar from '../components/ui/Avatar'
 import { useUsers } from '../hooks/useUsers'
-import { updateTask, completeAndRecur } from '../services/tasks'
-import { updateLead } from '../services/leads'
+import { updateTask, completeAndRecur, completarSeguimiento } from '../services/tasks'
+import { getLead } from '../services/leads'
 import { createNotification } from '../services/notifications'
+import SeguimientoModal from '../components/crm/SeguimientoModal'
 import toast from 'react-hot-toast'
 
 function applyOrder(tasks, order) {
@@ -246,6 +247,8 @@ export default function Tasks() {
   const [activeView, setActiveView] = useState('today')
   const [showModal, setShowModal] = useState(false)
   const [editTask, setEditTask] = useState(null)
+  const [seguimientoTask, setSeguimientoTask] = useState(null)
+  const [savingSeguimiento, setSavingSeguimiento] = useState(false)
   const [selectedUid, setSelectedUid] = useState('me')
 
   const normalCol = useColState()
@@ -339,33 +342,55 @@ export default function Tasks() {
   const handleEdit = (task) => { setEditTask(task); setShowModal(true) }
   const handleClose = () => { setShowModal(false); setEditTask(null) }
 
+  const finishTaskStatus = async (task) => {
+    // Verificación va primero, incluso en recurrentes
+    if (task.verifiedBy && task.verifiedBy !== currentUser.uid) {
+      await updateTask(task.id, { status: 'pending_response' })
+      await createNotification({ recipientId: task.verifiedBy, taskId: task.id, taskTitle: task.title, type: 'completed', senderName: userProfile?.displayName })
+      toast.success('✓ Enviada a verificación')
+    } else if (task.type === 'recurring' && task.recurrence) {
+      await completeAndRecur(task, currentUser.uid)
+      toast.success('✓ Completada. Próxima ocurrencia creada.')
+    } else {
+      await updateTask(task.id, { status: 'done' })
+      toast.success('✓ Tarea finalizada')
+    }
+  }
+
   const handleComplete = async (task) => {
+    // Las tareas de seguimiento de cliente exigen registrar qué pasó antes de poder completarse
+    if (task.clienteId) { setSeguimientoTask(task); return }
     try {
-      // Verificación va primero, incluso en recurrentes
-      if (task.verifiedBy && task.verifiedBy !== currentUser.uid) {
-        await updateTask(task.id, { status: 'pending_response' })
-        await createNotification({ recipientId: task.verifiedBy, taskId: task.id, taskTitle: task.title, type: 'completed', senderName: userProfile?.displayName })
-        toast.success('✓ Enviada a verificación')
-      } else if (task.type === 'recurring' && task.recurrence) {
-        await completeAndRecur(task, currentUser.uid)
-        toast.success('✓ Completada. Próxima ocurrencia creada.')
-      } else {
-        await updateTask(task.id, { status: 'done' })
-        toast.success('✓ Tarea finalizada')
-      }
-      // Si es tarea de seguimiento de cliente, actualizar ficha
-      if (task.clienteId) {
-        const hoy = new Date()
-        const nextDate = new Date(hoy)
-        nextDate.setDate(nextDate.getDate() + 45)
-        const fmt = (d) => d.toISOString().split('T')[0]
-        await updateLead(task.clienteId, {
-          ultimoSeguimiento: fmt(hoy),
-          proximoSeguimiento: fmt(nextDate),
-          seguimientoTaskId: null,
+      await finishTaskStatus(task)
+    } catch { toast.error('Error al completar la tarea') }
+  }
+
+  const handleConfirmSeguimiento = async ({ actualizado, comentario }) => {
+    const task = seguimientoTask
+    if (!task) return
+    setSavingSeguimiento(true)
+    try {
+      await finishTaskStatus(task)
+      const cliente = await getLead(task.clienteId)
+      if (cliente) {
+        const texto = (actualizado ? '✅ Cliente actualizado — ' : '⚠️ No se pudo contactar — ') + comentario
+        await completarSeguimiento({
+          companyId: task.companyId,
+          cliente,
+          assignedToUid: task.assignedTo,
+          tipo: task.seguimientoType || 'cliente_activo',
+          comentario: texto,
+          user: currentUser,
         })
       }
-    } catch { toast.error('Error al completar la tarea') }
+      setSeguimientoTask(null)
+      toast.success('Seguimiento registrado. Próximo en 45 días.')
+    } catch (err) {
+      console.error('Error al registrar seguimiento:', err)
+      toast.error('Error al registrar el seguimiento')
+    } finally {
+      setSavingSeguimiento(false)
+    }
   }
 
   const handleVerify = async (task) => {
@@ -505,6 +530,13 @@ export default function Tasks() {
       </div>
 
       <TaskModal isOpen={showModal} onClose={handleClose} task={editTask} users={users} />
+      <SeguimientoModal
+        isOpen={!!seguimientoTask}
+        onClose={() => setSeguimientoTask(null)}
+        onConfirm={handleConfirmSeguimiento}
+        clienteNombre={seguimientoTask?.title?.replace(/^Seguimiento( Cliente Perdido)? "|"$/g, '')}
+        saving={savingSeguimiento}
+      />
     </div>
   )
 }

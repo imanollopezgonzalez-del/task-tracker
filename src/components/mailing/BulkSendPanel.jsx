@@ -3,9 +3,9 @@ import { X, Send, Loader2, Users, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { subscribeLeads } from '../../services/leads'
-import { subscribeConnectedAccounts, subscribeMailTemplates, sendBulkEmail } from '../../services/mailing'
+import { subscribeConnectedAccounts, subscribeMailTemplates, subscribeUnsubscribedEmails, sendBulkEmail } from '../../services/mailing'
 import { TIPOS_CLIENTE, PRODUCTOS, RESPONSABLES } from '../../utils/crmConstants'
-import { AUDIENCE_TYPES, CLIENTE_SEGMENTOS, filterAudience, resolveRecipient } from '../../utils/mailingAudience'
+import { AUDIENCE_TYPES, CLIENTE_SEGMENTOS, filterAudience, resolveRecipient, excludeUnsubscribed } from '../../utils/mailingAudience'
 import { useMailEditor, EmailEditorToolbar, EditorContent } from './EmailBodyEditor'
 
 const MAX_RECIPIENTS = 500
@@ -17,6 +17,7 @@ export default function BulkSendPanel({ onClose }) {
   const [leads, setLeads] = useState([])
   const [accounts, setAccounts] = useState([])
   const [templates, setTemplates] = useState([])
+  const [unsubscribedEmails, setUnsubscribedEmails] = useState(new Set())
   const [fromAccountId, setFromAccountId] = useState('')
   const [audienceType, setAudienceType] = useState('clientes')
   const [tipo, setTipo] = useState('')
@@ -52,17 +53,24 @@ export default function BulkSendPanel({ onClose }) {
     return unsub
   }, [companyId])
 
+  useEffect(() => {
+    if (!companyId) return
+    const unsub = subscribeUnsubscribedEmails(companyId, setUnsubscribedEmails)
+    return unsub
+  }, [companyId])
+
   const audience = useMemo(() => {
     const matched = filterAudience(leads, { audienceType, tipo, producto, responsable, segmentos })
-    const recipients = []
+    const resolved = []
     let sinEmail = 0
     matched.forEach((r) => {
       const recipient = resolveRecipient(r)
-      if (recipient) recipients.push(recipient)
+      if (recipient) resolved.push(recipient)
       else sinEmail += 1
     })
-    return { recipients, sinEmail, total: matched.length }
-  }, [leads, audienceType, tipo, producto, responsable, segmentos])
+    const { recipients, excluidos } = excludeUnsubscribed(resolved, unsubscribedEmails)
+    return { recipients, sinEmail, excluidos, total: matched.length }
+  }, [leads, audienceType, tipo, producto, responsable, segmentos, unsubscribedEmails])
 
   const toggleSegmento = (key) => {
     setSegmentos((prev) => prev.includes(key) ? prev.filter((s) => s !== key) : [...prev, key])
@@ -204,6 +212,7 @@ export default function BulkSendPanel({ onClose }) {
               <Users size={13} />
               {audience.recipients.length} destinatario{audience.recipients.length !== 1 ? 's' : ''} con email
               {audience.sinEmail > 0 && ` · ${audience.sinEmail} sin email, no reciben`}
+              {audience.excluidos > 0 && ` · ${audience.excluidos} dado${audience.excluidos !== 1 ? 's' : ''} de baja, no reciben`}
               {overLimit && (
                 <span className="flex items-center gap-1 font-medium">
                   <AlertTriangle size={13} /> supera el máximo de {MAX_RECIPIENTS}

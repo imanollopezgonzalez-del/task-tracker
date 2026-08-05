@@ -5,14 +5,18 @@ import {
   StickyNote, AlertCircle, Send, Phone, Mail, User, Calendar,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useUsers } from '../../hooks/useUsers'
 import { getLead, updateLead, deleteLead, addNota, updateNota, subscribeNotas, deleteNota } from '../../services/leads'
+import { completarSeguimiento } from '../../services/tasks'
 import {
   CONTACTO_STAGES, NOTE_TYPES, TIPO_CLIENTE_COLORS,
   TIPOS_CLIENTE, PRODUCTOS, ORIGENES_CONTACTO, LISTAS_PRECIO,
 } from '../../utils/crmConstants'
 import { getResponsables } from '../../utils/crmHelpers'
+import { toInputDate } from '../../utils/dates'
 import LeadForm from '../../components/crm/LeadForm'
 import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
+import SeguimientoModal from '../../components/crm/SeguimientoModal'
 import toast from 'react-hot-toast'
 
 // ── Inline editing ─────────────────────────────────────────────────────────────
@@ -230,11 +234,14 @@ export default function ClienteDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { currentUser, userProfile } = useAuth()
+  const { users } = useUsers()
   const [cliente, setCliente] = useState(null)
   const [notas, setNotas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
   const [showComposeEmail, setShowComposeEmail] = useState(false)
+  const [showSeguimientoModal, setShowSeguimientoModal] = useState(false)
+  const [savingSeguimiento, setSavingSeguimiento] = useState(false)
   const [notaTexto, setNotaTexto] = useState('')
   const [notaTipo, setNotaTipo] = useState('nota')
   const [savingNota, setSavingNota] = useState(false)
@@ -257,7 +264,7 @@ export default function ClienteDetail() {
 
   const handleMarcarPerdido = async () => {
     if (!window.confirm(`¿Marcar "${cliente?.nombre}" como cliente perdido?`)) return
-    const today = new Date().toISOString().split('T')[0]
+    const today = toInputDate(new Date())
     await updateLead(id, {
       clienteEstado: 'perdido',
       fechaPerdido: today,
@@ -271,14 +278,14 @@ export default function ClienteDetail() {
     const hoy = new Date()
     const nextDate = new Date(hoy)
     nextDate.setDate(nextDate.getDate() + 45)
-    const fmt = (d) => d.toISOString().split('T')[0]
+    const nextStr = toInputDate(nextDate)
     await updateLead(id, {
       clienteEstado: 'activo',
       fechaPerdido: null,
-      proximoSeguimiento: fmt(nextDate),
+      proximoSeguimiento: nextStr,
       seguimientoTaskId: null,
     })
-    setCliente((c) => ({ ...c, clienteEstado: 'activo', fechaPerdido: null, proximoSeguimiento: fmt(nextDate) }))
+    setCliente((c) => ({ ...c, clienteEstado: 'activo', fechaPerdido: null, proximoSeguimiento: nextStr }))
     toast.success('Cliente recuperado')
   }
 
@@ -305,19 +312,33 @@ export default function ClienteDetail() {
     navigate('/crm/clientes')
   }
 
-  const handleRegistrarSeguimiento = async () => {
-    const hoy = new Date()
-    const nextDate = new Date(hoy)
-    nextDate.setDate(nextDate.getDate() + 45)
-    const fmt = (d) => d.toISOString().split('T')[0]
-    const updates = {
-      ultimoSeguimiento: fmt(hoy),
-      proximoSeguimiento: fmt(nextDate),
-      seguimientoTaskId: null,
+  // Registrar seguimiento exige el mismo comentario obligatorio que completar la tarea desde Tasks
+  const handleRegistrarSeguimiento = () => setShowSeguimientoModal(true)
+
+  const handleConfirmSeguimiento = async ({ actualizado, comentario }) => {
+    if (!cliente) return
+    setSavingSeguimiento(true)
+    try {
+      const primerResponsable = getResponsables(cliente)[0]
+      const responsableUser = users.find((u) => u.displayName === primerResponsable)
+      const texto = (actualizado ? '✅ Cliente actualizado — ' : '⚠️ No se pudo contactar — ') + comentario
+      const result = await completarSeguimiento({
+        companyId: userProfile?.companyId,
+        cliente,
+        assignedToUid: responsableUser?.uid || currentUser.uid,
+        tipo: cliente.clienteEstado === 'perdido' ? 'cliente_perdido' : 'cliente_activo',
+        comentario: texto,
+        user: currentUser,
+      })
+      setCliente((c) => ({ ...c, ...result }))
+      setShowSeguimientoModal(false)
+      toast.success('Seguimiento registrado. Próximo en 45 días.')
+    } catch (err) {
+      console.error('Error al registrar seguimiento:', err)
+      toast.error('Error al registrar el seguimiento')
+    } finally {
+      setSavingSeguimiento(false)
     }
-    await updateLead(id, updates)
-    setCliente((c) => ({ ...c, ...updates }))
-    toast.success('Seguimiento registrado. Próximo en 45 días.')
   }
 
   const handleAddNota = async (e) => {
@@ -583,6 +604,14 @@ export default function ClienteDetail() {
           onClose={() => setShowComposeEmail(false)}
         />
       )}
+
+      <SeguimientoModal
+        isOpen={showSeguimientoModal}
+        onClose={() => setShowSeguimientoModal(false)}
+        onConfirm={handleConfirmSeguimiento}
+        clienteNombre={cliente?.nombre}
+        saving={savingSeguimiento}
+      />
     </div>
   )
 }

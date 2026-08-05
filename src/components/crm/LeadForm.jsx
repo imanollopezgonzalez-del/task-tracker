@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import PhoneInput from 'react-phone-number-input'
+import 'react-phone-number-input/style.css'
 import { useAuth } from '../../contexts/AuthContext'
 import { createLead, updateLead, addNota } from '../../services/leads'
 import {
@@ -7,6 +9,7 @@ import {
   ORIGENES_CONTACTO, RESPONSABLES, LISTAS_PRECIO,
 } from '../../utils/crmConstants'
 import { getResponsables } from '../../utils/crmHelpers'
+import AddressAutocomplete from './AddressAutocomplete'
 import toast from 'react-hot-toast'
 
 const EMPTY_CONTACTO = { nombre: '', puesto: '', telefono: '', emails: [''] }
@@ -20,6 +23,8 @@ const EMPTY = {
   producto: '',
   contactos: [{ ...EMPTY_CONTACTO }],
   ubicacion: '',
+  ubicacionLat: null,
+  ubicacionLng: null,
   responsables: [],
   origenContacto: '',
   observaciones: '',
@@ -49,6 +54,8 @@ export default function LeadForm({ lead, companyId, onClose, showContactoFields 
                 emails: lead.email ? [lead.email] : [''],
               }],
           ubicacion: lead.ubicacion || '',
+          ubicacionLat: lead.ubicacionLat ?? null,
+          ubicacionLng: lead.ubicacionLng ?? null,
           responsables: getResponsables(lead),
           origenContacto: lead.origenContacto || '',
           observaciones: lead.observaciones || '',
@@ -222,11 +229,13 @@ export default function LeadForm({ lead, companyId, onClose, showContactoFields 
                   </div>
                   <div>
                     <label className="label">Teléfono</label>
-                    <input
-                      className="input-field"
+                    <PhoneInput
+                      international
+                      defaultCountry="AR"
+                      className="phone-field"
                       value={c.telefono}
-                      onChange={(e) => setContacto(ci, 'telefono', e.target.value)}
-                      placeholder="+54 11 ..."
+                      onChange={(val) => setContacto(ci, 'telefono', val || '')}
+                      placeholder="11 1234 5678"
                     />
                   </div>
                   <div>
@@ -265,10 +274,10 @@ export default function LeadForm({ lead, companyId, onClose, showContactoFields 
           {/* Ubicación */}
           <div>
             <label className="label">Ubicación</label>
-            <input
-              className="input-field"
+            <AddressAutocomplete
               value={form.ubicacion}
-              onChange={(e) => set('ubicacion', e.target.value)}
+              onChange={(val) => set('ubicacion', val)}
+              onPlaceSelected={(lat, lng) => setForm((f) => ({ ...f, ubicacionLat: lat, ubicacionLng: lng }))}
               placeholder="Ciudad, Provincia, Argentina"
             />
           </div>

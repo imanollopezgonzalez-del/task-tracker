@@ -1,6 +1,6 @@
 import { db } from '../firebase'
 import {
-  doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp,
+  doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, onSnapshot, serverTimestamp,
 } from 'firebase/firestore'
 
 // Email interno: solo desde el nombre de usuario (sin código empresa)
@@ -22,6 +22,7 @@ export const createUserProfile = async (user, extra = {}) => {
     displayName: extra.displayName || user.displayName || user.email.split('@')[0],
     role: extra.role || 'member',
     companyId: extra.companyId || null,
+    crmAccess: extra.crmAccess === true,
     fcmToken: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -72,4 +73,30 @@ export const getCompany = async (companyId) => {
   if (!companyId) return null
   const snap = await getDoc(doc(db, 'companies', companyId))
   return snap.exists() ? { id: snap.id, ...snap.data() } : null
+}
+
+// ── Login con Google: whitelist de emails autorizados (colección usuariosAutorizados) ──
+
+const normalizeEmail = (email) => email.trim().toLowerCase()
+
+export const getUsuarioAutorizado = async (email) => {
+  const snap = await getDoc(doc(db, 'usuariosAutorizados', normalizeEmail(email)))
+  return snap.exists() ? snap.data() : null
+}
+
+export const subscribeUsuariosAutorizados = (companyId, callback) => {
+  const q = query(collection(db, 'usuariosAutorizados'), where('companyId', '==', companyId))
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map((d) => ({ email: d.id, ...d.data() })))
+  })
+}
+
+export const addUsuarioAutorizado = async (email, { companyId, role = 'member', crmAccess = false }) => {
+  await setDoc(doc(db, 'usuariosAutorizados', normalizeEmail(email)), {
+    companyId, role, crmAccess, createdAt: serverTimestamp(),
+  })
+}
+
+export const removeUsuarioAutorizado = async (email) => {
+  await deleteDoc(doc(db, 'usuariosAutorizados', normalizeEmail(email)))
 }

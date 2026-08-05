@@ -3,13 +3,19 @@ import {
   collection, doc, addDoc, updateDoc, deleteDoc, getDoc,
   query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore'
-import { addDays, addWeeks, addMonths, addYears } from 'date-fns'
+import { addDays, addWeeks, addMonths, addYears, format } from 'date-fns'
+import { updateLead, addNota } from './leads'
 
 const TASKS_COL = 'tasks'
 const COMMENTS_SUB = 'comments'
+const SEGUIMIENTO_DIAS = 45
 
 // Parsea "YYYY-MM-DD" como medianoche local (evita que new Date("YYYY-MM-DD") use UTC)
 const parseLocalDate = (str) => new Date(str + 'T00:00:00')
+
+// Formatea a "YYYY-MM-DD" en hora LOCAL (a diferencia de toISOString(), que convierte a UTC
+// y puede correr la fecha al día siguiente entre las 21:00 y 23:59 hora Argentina)
+const toLocalDateStr = (d) => format(d, 'yyyy-MM-dd')
 
 const sortByCreated = (tasks) =>
   [...tasks].sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
@@ -87,7 +93,7 @@ export const subscribeComments = (taskId, callback) => {
   }, (err) => console.error('subscribeComments error:', err))
 }
 
-export const createSeguimientoTask = async (companyId, cliente, assignedToUid, tipo = 'cliente_activo') => {
+export const createSeguimientoTask = async (companyId, cliente, assignedToUid, tipo = 'cliente_activo', dueDate = new Date()) => {
   const title = tipo === 'cliente_perdido'
     ? `Seguimiento Cliente Perdido "${cliente.nombre}"`
     : `Seguimiento "${cliente.nombre}"`
@@ -101,12 +107,35 @@ export const createSeguimientoTask = async (companyId, cliente, assignedToUid, t
     assignedTo: assignedToUid,
     clienteId: cliente.id,
     seguimientoType: tipo,
-    dueDate: Timestamp.fromDate(new Date()),
+    dueDate: Timestamp.fromDate(dueDate),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     completedAt: null,
   })
   return ref.id
+}
+
+// Se llama cuando alguien completa una tarea de seguimiento de cliente (o la registra
+// manualmente desde la ficha): exige un comentario de actualización, lo deja asentado
+// como nota en el cliente, y crea de una vez la próxima tarea de seguimiento a +45 días
+// (en vez de depender de que alguien abra /crm/clientes ese día para que se genere).
+export const completarSeguimiento = async ({ companyId, cliente, assignedToUid, tipo = 'cliente_activo', comentario, user }) => {
+  if (!comentario || !comentario.trim()) throw new Error('El comentario de seguimiento es obligatorio')
+
+  const hoy = new Date()
+  const proximaFecha = addDays(hoy, SEGUIMIENTO_DIAS)
+
+  await addNota(cliente.id, comentario.trim(), 'seguimiento', user)
+
+  const nuevaTaskId = await createSeguimientoTask(companyId, cliente, assignedToUid, tipo, proximaFecha)
+
+  await updateLead(cliente.id, {
+    ultimoSeguimiento: toLocalDateStr(hoy),
+    proximoSeguimiento: toLocalDateStr(proximaFecha),
+    seguimientoTaskId: nuevaTaskId,
+  })
+
+  return { ultimoSeguimiento: toLocalDateStr(hoy), proximoSeguimiento: toLocalDateStr(proximaFecha), seguimientoTaskId: nuevaTaskId }
 }
 
 export const completeAndRecur = async (task, userId) => {

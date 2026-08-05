@@ -3,19 +3,24 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /mailing/{companyId}/{allPaths=**} {
-      // Gmail y los destinatarios necesitan poder cargar la imagen/adjunto sin auth
-      allow read: if true;
-
       // Antes esto validaba companyId/role leyendo el perfil del usuario en Firestore
-      // desde la regla (firestore.get(...) cross-service). Esa lectura cruzada dio
-      // "storage/unauthorized" incluso con el usuario y companyId correctos (permisos
-      // ya verificados a mano en Firestore) — es una característica frágil de Storage
-      // Rules en la práctica. La autorización real y confiable de "quién puede mandar
-      // este archivo como adjunto" ya la hace sendMail/sendBulkMail del lado del
-      // servidor (Admin SDK, valida el path contra el companyId real del caller,
-      // ver functions/mailing.js) — acá solo hace falta estar logueado en la app.
-      allow write: if request.auth != null
-        && request.resource.size < 10 * 1024 * 1024;
+      // desde la regla (firestore.get(...) cross-service). Esa lectura cruzada daba
+      // "storage/unauthorized" incluso con el usuario y companyId correctos — es una
+      // limitación conocida de Storage Rules (el contexto de seguridad para leer otro
+      // servicio desde acá no siempre resuelve bien). En vez de abrir la regla a
+      // "cualquier logueado" (que exponía adjuntos de mailing de cualquier empresa a
+      // cualquier usuario, incluso sin acceso al CRM), usamos custom claims: un Cloud
+      // Function (syncUserClaims, ver functions/customClaims.js) mantiene companyId/
+      // role/crmAccess como claims del ID token cada vez que cambia el perfil en
+      // Firestore, y esos claims SÍ se leen directo acá sin ninguna lectura cruzada.
+      function isCompanyCrmUser() {
+        return request.auth != null
+          && request.auth.token.companyId == companyId
+          && (request.auth.token.role == 'admin' || request.auth.token.crmAccess == true);
+      }
+
+      allow read: if isCompanyCrmUser();
+      allow write: if isCompanyCrmUser() && request.resource.size < 10 * 1024 * 1024;
     }
   }
 }

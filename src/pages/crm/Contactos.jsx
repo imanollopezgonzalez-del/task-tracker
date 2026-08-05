@@ -8,6 +8,7 @@ import {
 } from '../../utils/crmConstants'
 import { getResponsables, getCamposFaltantesParaGanado } from '../../utils/crmHelpers'
 import { setDragGhost } from '../../utils/dragGhost'
+import { toInputDate } from '../../utils/dates'
 import toast from 'react-hot-toast'
 
 const ALL_STAGES = Object.keys(CONTACTO_STAGES)
@@ -299,7 +300,7 @@ export default function Contactos() {
       const hoy = new Date()
       const nextDate = new Date(hoy)
       nextDate.setDate(nextDate.getDate() + 45)
-      const fmt = (d) => d.toISOString().split('T')[0]
+      const fmt = toInputDate
       await updateLead(cardId, {
         registroTipo: 'cliente',
         estadoContacto: 'ganado',

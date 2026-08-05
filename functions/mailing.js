@@ -1,4 +1,4 @@
-const { onCall, HttpsError } = require('firebase-functions/v2/https')
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { defineSecret } = require('firebase-functions/params')
 const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const { getStorage } = require('firebase-admin/storage')
@@ -14,6 +14,154 @@ const MAILING_TOKENS_COL = 'mailingTokens'
 const MAILING_SETTINGS_COL = 'mailingSettings'
 const MAILING_LOGS_COL = 'mailingLogs'
 const MAILING_CAMPAIGNS_COL = 'mailCampaigns'
+const MAILING_UNSUBSCRIBES_COL = 'mailingUnsubscribes'
+
+// Región fija de despliegue de las Cloud Functions de mailing (ver functions/index.js) —
+// necesaria para armar URLs públicas absolutas de tracking que van DENTRO del HTML del email.
+const FUNCTIONS_REGION = 'us-central1'
+const PROJECT_ID = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'gestion-tareas-pariggi'
+const FUNCTIONS_BASE_URL = `https://${FUNCTIONS_REGION}-${PROJECT_ID}.cloudfunctions.net`
+
+// ---------------------------------------------------------------------------
+// Fase 2: tracking de apertura/clicks + baja de suscripción
+// ---------------------------------------------------------------------------
+
+const toBase64Url = (str) => Buffer.from(str, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+const fromBase64Url = (str) => Buffer.from(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')
+
+// Reescribe el HTML del email antes de mandarlo: cada <a href> pasa por un redirect que
+// registra el click, se agrega un pixel de 1x1 para registrar apertura, y un link de baja
+// de suscripción al pie. logId es el id (todavía no escrito) del futuro doc en mailingLogs —
+// se genera antes con db.collection(...).doc() para poder embeberlo acá.
+function injectTracking(html, logId) {
+  if (!logId) return html
+  const trackOpenUrl = `${FUNCTIONS_BASE_URL}/trackOpen?l=${logId}`
+  const unsubscribeUrl = `${FUNCTIONS_BASE_URL}/unsubscribe?l=${logId}`
+
+  const rewritten = (html || '').replace(/(<a\s+[^>]*?href=)(["'])(.*?)\2/gi, (match, prefix, quote, url) => {
+    const trimmed = url.trim()
+    if (!trimmed || /^(mailto:|tel:|#)/i.test(trimmed)) return match
+    const trackUrl = `${FUNCTIONS_BASE_URL}/trackClick?l=${logId}&u=${toBase64Url(trimmed)}`
+    return `${prefix}${quote}${trackUrl}${quote}`
+  })
+
+  const pixel = `<img src="${trackOpenUrl}" width="1" height="1" style="display:none" alt="" />`
+  const footer = `<p style="font-size:11px;color:#999;margin-top:24px;">` +
+    `¿No querés recibir más estos emails? <a href="${unsubscribeUrl}" style="color:#999;">Darte de baja</a></p>`
+
+  return `${rewritten}${footer}${pixel}`
+}
+
+async function registerOpen(db, logId) {
+  const logRef = db.doc(`${MAILING_LOGS_COL}/${logId}`)
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(logRef)
+    if (!snap.exists) return
+    const data = snap.data()
+    const isFirstOpen = !data.firstOpenedAt
+    tx.update(logRef, {
+      openCount: FieldValue.increment(1),
+      lastOpenedAt: FieldValue.serverTimestamp(),
+      ...(isFirstOpen ? { firstOpenedAt: FieldValue.serverTimestamp() } : {}),
+    })
+    if (isFirstOpen && data.campaignId) {
+      tx.update(db.doc(`${MAILING_CAMPAIGNS_COL}/${data.campaignId}`), { openedCount: FieldValue.increment(1) })
+    }
+  })
+}
+
+async function registerClick(db, logId) {
+  const logRef = db.doc(`${MAILING_LOGS_COL}/${logId}`)
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(logRef)
+    if (!snap.exists) return
+    const data = snap.data()
+    const isFirstClick = !data.firstClickedAt
+    tx.update(logRef, {
+      clickCount: FieldValue.increment(1),
+      lastClickedAt: FieldValue.serverTimestamp(),
+      ...(isFirstClick ? { firstClickedAt: FieldValue.serverTimestamp() } : {}),
+    })
+    if (isFirstClick && data.campaignId) {
+      tx.update(db.doc(`${MAILING_CAMPAIGNS_COL}/${data.campaignId}`), { clickedCount: FieldValue.increment(1) })
+    }
+  })
+}
+
+const TRANSPARENT_GIF_PIXEL = Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64')
+
+// Endpoint público (no-callable, sin auth): lo carga el cliente de correo del destinatario
+// como una <img>. Nunca debe devolver un error visible — si el logId no existe simplemente
+// no registra nada y sirve el pixel igual, para no romper el render del email.
+const trackOpen = onRequest(async (req, res) => {
+  res.set('Content-Type', 'image/gif')
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+  const logId = typeof req.query.l === 'string' ? req.query.l : null
+  if (logId) {
+    try { await registerOpen(getFirestore(), logId) } catch (err) { console.error('trackOpen error', err) }
+  }
+  res.status(200).send(TRANSPARENT_GIF_PIXEL)
+})
+
+// Endpoint público: redirige al link real, registrando el click antes. Solo redirige a
+// http(s) (nunca javascript:/data:/etc) para no habilitar esquemas peligrosos vía este proxy.
+const trackClick = onRequest(async (req, res) => {
+  const logId = typeof req.query.l === 'string' ? req.query.l : null
+  const encoded = typeof req.query.u === 'string' ? req.query.u : null
+  let targetUrl = null
+  if (encoded) {
+    try { targetUrl = fromBase64Url(encoded) } catch { targetUrl = null }
+  }
+  if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
+    res.status(400).send('Link inválido')
+    return
+  }
+  if (logId) {
+    try { await registerClick(getFirestore(), logId) } catch (err) { console.error('trackClick error', err) }
+  }
+  res.redirect(302, targetUrl)
+})
+
+const escapeHtml = (str) => String(str)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
+function unsubscribePage(message) {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Baja de suscripción</title>` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<style>body{font-family:system-ui,-apple-system,sans-serif;max-width:480px;margin:80px auto;` +
+    `text-align:center;color:#1a1a1a;padding:0 20px;line-height:1.5}</style>` +
+    `</head><body><h2>${message}</h2></body></html>`
+}
+
+// Endpoint público: marca el email del destinatario como dado de baja de envíos masivos
+// para esa empresa (mailingUnsubscribes/{companyId}_{email}). No requiere auth — es el
+// link que el propio destinatario clickea desde su email.
+const unsubscribe = onRequest(async (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8')
+  const logId = typeof req.query.l === 'string' ? req.query.l : null
+  if (!logId) {
+    res.status(400).send(unsubscribePage('Link inválido.'))
+    return
+  }
+  try {
+    const db = getFirestore()
+    const logSnap = await db.doc(`${MAILING_LOGS_COL}/${logId}`).get()
+    if (!logSnap.exists) {
+      res.status(200).send(unsubscribePage('Este link ya no es válido.'))
+      return
+    }
+    const { companyId, to } = logSnap.data()
+    const email = (to || '').toLowerCase()
+    await db.doc(`${MAILING_UNSUBSCRIBES_COL}/${companyId}_${email}`).set({
+      companyId, email, unsubscribedAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+    res.status(200).send(unsubscribePage(`Listo — <strong>${escapeHtml(email)}</strong> no va a recibir más envíos masivos de esta empresa.`))
+  } catch (err) {
+    console.error('unsubscribe error', err)
+    res.status(500).send(unsubscribePage('Hubo un error. Intentá de nuevo más tarde.'))
+  }
+})
 
 async function createMailCampaign(db, {
   companyId, subject, fromAccountId, fromEmail, sentBy, sentByName,
@@ -185,6 +333,11 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
     audienceType: 'individual', recipientCount: 1,
   })
 
+  // Se genera el id del log ANTES de mandar el mail (sin escribir nada todavía) para poder
+  // embeber ese id en el pixel de apertura, el link de baja y los links reescritos del propio
+  // cuerpo del email — ver injectTracking.
+  const logRef = db.collection(MAILING_LOGS_COL).doc()
+
   const logBase = {
     companyId: caller.companyId,
     fromAccountId,
@@ -201,7 +354,7 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
   }
 
   const fail = async (errorMessage) => {
-    await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage })
+    await logRef.set({ ...logBase, status: 'error', errorMessage })
     await bumpCampaignCounter(db, campaignId, 'failedCount')
     await finishCampaign(db, campaignId)
   }
@@ -249,7 +402,7 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
       from: fromEmail,
       to,
       subject,
-      html: htmlBody,
+      html: injectTracking(htmlBody, logRef.id),
       attachments: mailAttachments,
     })
     const mimeMessage = await new Promise((resolve, reject) => {
@@ -273,7 +426,7 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
     throw new HttpsError('internal', 'Gmail rechazó el envío del email')
   }
 
-  const logRef = await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'sent', gmailMessageId })
+  await logRef.set({ ...logBase, status: 'sent', gmailMessageId })
   await bumpCampaignCounter(db, campaignId, 'sentCount')
   await finishCampaign(db, campaignId)
 
@@ -346,6 +499,12 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
     }
   }
 
+  // Defensa en profundidad: el frontend ya excluye a los dados de baja del conteo/lista
+  // (ver mailingAudience.js), pero si la lista llegó stale (otra pestaña dio de baja a
+  // alguien mientras se armaba este envío) igual no le mandamos nada acá.
+  const unsubSnap = await db.collection(MAILING_UNSUBSCRIBES_COL).where('companyId', '==', caller.companyId).get()
+  const unsubscribedEmails = new Set(unsubSnap.docs.map((d) => d.data().email))
+
   const campaignId = await createMailCampaign(db, {
     companyId: caller.companyId, subject, fromAccountId, fromEmail,
     sentBy: caller.uid, sentByName: caller.displayName,
@@ -355,12 +514,26 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
   const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
 
   for (const recipient of recipients) {
+    if (unsubscribedEmails.has(recipient.email.toLowerCase())) {
+      await db.collection(MAILING_LOGS_COL).add({
+        companyId: caller.companyId, fromAccountId, fromEmail, to: recipient.email,
+        subject: applyMergeFields(subject, recipient), hasAttachments: mailAttachments.length > 0,
+        leadId: recipient.leadId || null, campaignId, sentBy: caller.uid, sentByName: caller.displayName,
+        createdAt: FieldValue.serverTimestamp(), status: 'skipped', errorMessage: 'unsubscribed',
+      })
+      await bumpCampaignCounter(db, campaignId, 'skippedCount')
+      continue
+    }
+
     const personalizedSubject = applyMergeFields(subject, recipient)
     const personalizedBody = applyMergeFields(htmlBody, recipient)
     // No guardamos htmlBody acá (a diferencia de sendMail): con plantillas HTML reales de
     // 50-100KB+ y hasta 500 destinatarios, escribir el cuerpo completo en cada log individual
     // puede acercarse o superar el límite de 1 MiB por documento de Firestore y arriesga
     // hacer fallar la campaña entera escritura por escritura. El subject es chico, se guarda igual.
+    // Igual que en sendMail, el id del log se genera antes de mandar para poder embeberlo
+    // en el pixel/links/baja reescritos en el propio cuerpo del email de este destinatario.
+    const logRef = db.collection(MAILING_LOGS_COL).doc()
     const logBase = {
       companyId: caller.companyId,
       fromAccountId,
@@ -383,7 +556,7 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
           from: fromEmail,
           to: recipient.email,
           subject: personalizedSubject,
-          html: personalizedBody,
+          html: injectTracking(personalizedBody, logRef.id),
           attachments: mailAttachments,
         })
         const mimeMessage = await new Promise((resolve, reject) => {
@@ -412,11 +585,11 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
     }
 
     if (!sendErr) {
-      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'sent', gmailMessageId })
+      await logRef.set({ ...logBase, status: 'sent', gmailMessageId })
       await bumpCampaignCounter(db, campaignId, 'sentCount')
     } else {
       console.error('sendBulkMail: fallo el envío a', recipient.email, sendErr.message)
-      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: sendErr.message || 'send_failed' })
+      await logRef.set({ ...logBase, status: 'error', errorMessage: sendErr.message || 'send_failed' })
       await bumpCampaignCounter(db, campaignId, 'failedCount')
     }
   }
@@ -426,4 +599,7 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
   return { ok: true, campaignId }
 })
 
-module.exports = { connectGmailAccount, disconnectGmailAccount, sendMail, sendBulkMail }
+module.exports = {
+  connectGmailAccount, disconnectGmailAccount, sendMail, sendBulkMail,
+  trackOpen, trackClick, unsubscribe,
+}

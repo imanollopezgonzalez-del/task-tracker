@@ -12,10 +12,54 @@ service cloud.firestore {
     match /users/{userId} {
       // Cualquier usuario autenticado de la misma empresa puede leer
       allow read: if signed() && (uid() == userId || myCompany() == resource.data.companyId);
-      // Cada usuario escribe su propio perfil
-      allow create, update: if uid() == userId;
-      // El admin puede actualizar o eliminar usuarios de su empresa (no a sí mismo)
+      // Cada usuario crea su propio perfil, PERO solo con los datos que un admin dejó
+      // preautorizados en usuariosAutorizados para su email (ver Admin.jsx "Acceso con
+      // Google"). Sin este chequeo, cualquier cuenta de Google podía autoasignarse
+      // role:'admin' + companyId de CUALQUIER empresa con un simple setDoc — el login con
+      // Google (loginWithGoogle en AuthContext.jsx) hacía este mismo chequeo del lado
+      // cliente, pero el cliente nunca es un límite de seguridad real.
+      allow create: if uid() == userId
+        && request.resource.data.companyId == get(/databases/$(database)/documents/usuariosAutorizados/$(request.auth.token.email)).data.companyId
+        && request.resource.data.role == get(/databases/$(database)/documents/usuariosAutorizados/$(request.auth.token.email)).data.role
+        && request.resource.data.crmAccess == get(/databases/$(database)/documents/usuariosAutorizados/$(request.auth.token.email)).data.crmAccess;
+      // Pero en updates posteriores NO puede tocar role/companyId/crmAccess él mismo —
+      // si no, se autoescalaría admin/otra empresa/acceso CRM, algo que ahora además
+      // terminaría reflejado en los custom claims del token (ver functions/customClaims.js)
+      // y desbloquearía Storage de cualquier empresa. Única excepción: el dueño real de
+      // la empresa (ownerUid en /companies, inmutable salvo por el propio dueño) puede
+      // autocorregir su rol a 'admin' si quedó mal seteado (ver Settings.jsx fixAdminRole) —
+      // no es una vía de autoescalada porque se verifica contra el ownerUid real, no contra
+      // el dato que el propio usuario declara en su perfil.
+      allow update: if uid() == userId && (
+        (
+          request.resource.data.role == resource.data.role
+          && request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.crmAccess == resource.data.crmAccess
+        ) || (
+          request.resource.data.companyId == resource.data.companyId
+          && request.resource.data.crmAccess == resource.data.crmAccess
+          && request.resource.data.role == 'admin'
+          && get(/databases/$(database)/documents/companies/$(resource.data.companyId)).data.ownerUid == uid()
+        )
+      );
+      // El admin puede actualizar o eliminar usuarios de su empresa (no a sí mismo) sin esa restricción
       allow update, delete: if isAdmin() && myCompany() == resource.data.companyId && uid() != userId;
+    }
+
+    // Login con Google — whitelist de emails autorizados por empresa (doc id = email en
+    // minúscula). El propio email puede leer su entrada (para saber si tiene acceso al
+    // hacer login con Google por primera vez, incluso antes de tener perfil en /users), y
+    // un admin puede leer/listar las de su propia empresa (panel "Acceso con Google" en
+    // Admin.jsx). Solo un admin puede autorizar/revocar, y únicamente para su propia
+    // empresa — en el update se valida TANTO el companyId nuevo como el que ya tenía el
+    // doc, para que el admin de una empresa no pueda pisar/robar el alta pendiente que
+    // otra empresa ya había creado para ese mismo email (el doc id es el email, así que
+    // el namespace es compartido entre empresas).
+    match /usuariosAutorizados/{email} {
+      allow read: if signed() && (request.auth.token.email == email || (isAdmin() && myCompany() == resource.data.companyId));
+      allow create: if isAdmin() && myCompany() == request.resource.data.companyId;
+      allow update: if isAdmin() && myCompany() == request.resource.data.companyId && myCompany() == resource.data.companyId;
+      allow delete: if isAdmin() && myCompany() == resource.data.companyId;
     }
 
     // Empresas
@@ -85,12 +129,23 @@ service cloud.firestore {
     match /mailTemplates/{templateId} {
       allow read: if hasCrm() && myCompany() == resource.data.companyId;
       allow create: if hasCrm() && myCompany() == request.resource.data.companyId;
-      allow update, delete: if hasCrm() && myCompany() == resource.data.companyId;
+      // companyId es inmutable en update: evita "mover" una plantilla a otra empresa
+      allow update: if hasCrm() && myCompany() == resource.data.companyId
+        && request.resource.data.companyId == resource.data.companyId;
+      allow delete: if hasCrm() && myCompany() == resource.data.companyId;
     }
 
     match /mailCampaigns/{campaignId} {
       allow read: if hasCrm() && myCompany() == resource.data.companyId;
       allow create, update, delete: if false; // solo Cloud Functions (Admin SDK)
+    }
+
+    // Mailing - Fase 2 (baja de suscripción). Se lee para excluir del envío masivo a quien
+    // se dio de baja; se escribe solo desde el endpoint público /unsubscribe (Admin SDK),
+    // nunca desde el cliente.
+    match /mailingUnsubscribes/{docId} {
+      allow read: if hasCrm() && myCompany() == resource.data.companyId;
+      allow write: if false;
     }
   }
 }
