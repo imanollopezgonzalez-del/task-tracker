@@ -12,6 +12,7 @@ import {
 } from '../../utils/crmConstants'
 import { getResponsables, getCamposFaltantesParaGanado } from '../../utils/crmHelpers'
 import LeadForm from '../../components/crm/LeadForm'
+import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
 import toast from 'react-hot-toast'
 
 // ── Pipeline ──────────────────────────────────────────────────────────────────
@@ -263,6 +264,7 @@ export default function ContactoDetail() {
   const [notas, setNotas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
+  const [showComposeEmail, setShowComposeEmail] = useState(false)
   const [notaTexto, setNotaTexto] = useState('')
   const [notaTipo, setNotaTipo] = useState('nota')
   const [savingNota, setSavingNota] = useState(false)
@@ -362,6 +364,7 @@ export default function ContactoDetail() {
       : []
 
   const stageOptions = Object.entries(CONTACTO_STAGES).map(([k, v]) => ({ key: k, label: v.label }))
+  const toEmail = contactosList[0]?.emails?.[0] || contacto.email || ''
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -371,6 +374,12 @@ export default function ContactoDetail() {
           <ArrowLeft size={16} />
         </button>
         <h1 className="text-base font-bold text-brand-text flex-1 truncate">{contacto.nombre}</h1>
+        <button
+          onClick={() => setShowComposeEmail(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border bg-white text-brand-text-muted border-brand-border hover:bg-brand-bg-2 transition-colors"
+        >
+          <Mail size={13} /> Nuevo email
+        </button>
         <button
           onClick={handleGanado}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
@@ -585,6 +594,14 @@ export default function ContactoDetail() {
           companyId={userProfile?.companyId}
           showContactoFields
           onClose={() => { setShowEdit(false); refreshContacto() }}
+        />
+      )}
+
+      {showComposeEmail && (
+        <ComposeEmailModal
+          to={toEmail}
+          leadId={id}
+          onClose={() => setShowComposeEmail(false)}
         />
       )}
     </div>

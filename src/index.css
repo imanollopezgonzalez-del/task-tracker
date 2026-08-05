@@ -59,4 +59,29 @@
   .sidebar-item-inactive {
     @apply text-white/70 hover:text-white hover:bg-white/10;
   }
+  .mail-editor-toolbar-btn {
+    @apply p-1.5 rounded-md text-brand-text-muted hover:bg-brand-bg-2 hover:text-brand-text transition-colors;
+  }
+  .mail-editor-toolbar-btn.is-active {
+    @apply bg-brand-orange-light text-brand-orange-dark;
+  }
 }
+
+.mail-editor-content .ProseMirror {
+  outline: none;
+  min-height: 220px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: #1C1917;
+}
+.mail-editor-content .ProseMirror p { margin: 0 0 0.75em; }
+.mail-editor-content .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #A8A29E;
+  pointer-events: none;
+  height: 0;
+}
+.mail-editor-content .ProseMirror a { color: #D97757; text-decoration: underline; }
+.mail-editor-content .ProseMirror img { max-width: 100%; border-radius: 6px; margin: 0.5em 0; }
+.mail-editor-content .ProseMirror ul, .mail-editor-content .ProseMirror ol { padding-left: 1.25em; margin: 0 0 0.75em; }

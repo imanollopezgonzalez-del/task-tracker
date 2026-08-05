@@ -20,7 +20,7 @@ const ADMIN_NAV = [
 
 // Sección CRM - solo para admin o usuarios con crmAccess
 const CRM_NAV = [
-  { to: '/crm/mailing', icon: Mail, label: 'Mailing', disabled: true },
+  { to: '/crm/mailing', icon: Mail, label: 'Mailing' },
   { to: '/crm/leads', icon: UserPlus, label: 'Leads' },
   { to: '/crm/contactos', icon: Contact, label: 'Contactos' },
   { to: '/crm/clientes', icon: Briefcase, label: 'Clientes' },

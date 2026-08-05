@@ -66,5 +66,20 @@ service cloud.firestore {
       allow read: if hasCrm() && myCompany() == companyId;
       allow write: if hasCrm() && myData().role == 'admin' && myCompany() == companyId;
     }
+
+    // Mailing - Fase 1 (cuentas Gmail conectadas, tokens, historial de envíos)
+    match /mailingSettings/{companyId} {
+      allow read: if hasCrm() && myCompany() == companyId;
+      allow write: if false; // solo Cloud Functions (Admin SDK)
+    }
+
+    match /mailingTokens/{accountId} {
+      allow read, write: if false; // 100% server-only, nunca accesible desde el cliente
+    }
+
+    match /mailingLogs/{logId} {
+      allow read: if hasCrm() && myCompany() == resource.data.companyId;
+      allow create, update, delete: if false; // solo Cloud Functions (Admin SDK)
+    }
   }
 }
