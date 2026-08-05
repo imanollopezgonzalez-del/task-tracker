@@ -1,10 +1,11 @@
 import { db, functions, storage } from '../firebase'
-import { doc, onSnapshot, collection, query, where } from 'firebase/firestore'
+import { doc, onSnapshot, collection, query, where, addDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { httpsCallable } from 'firebase/functions'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 const MAILING_SETTINGS_COL = 'mailingSettings'
 const MAILING_LOGS_COL = 'mailingLogs'
+const MAIL_TEMPLATES_COL = 'mailTemplates'
 
 export const subscribeConnectedAccounts = (companyId, callback) => {
   const settingsRef = doc(db, MAILING_SETTINGS_COL, companyId)
@@ -57,4 +58,42 @@ export const uploadMailingAttachment = async (companyId, file) => {
   // El backend usa "path" (no "url") para leer el archivo directo de Storage con el
   // Admin SDK y evitar que sendMail haga fetch() a una URL arbitraria (SSRF).
   return { filename: file.name, url, path, mimeType: file.type }
+}
+
+export const subscribeMailTemplates = (companyId, callback) => {
+  const q = query(collection(db, MAIL_TEMPLATES_COL), where('companyId', '==', companyId))
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error('subscribeMailTemplates error:', err)
+  )
+}
+
+export const createMailTemplate = async (companyId, uid, { name, subject, mode, body }) => {
+  await addDoc(collection(db, MAIL_TEMPLATES_COL), {
+    companyId,
+    createdBy: uid,
+    name,
+    subject,
+    mode,
+    richBodyHtml: mode === 'rich' ? body : null,
+    htmlSource: mode === 'html' ? body : null,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export const updateMailTemplate = async (templateId, { name, subject, mode, body }) => {
+  await updateDoc(doc(db, MAIL_TEMPLATES_COL, templateId), {
+    name,
+    subject,
+    mode,
+    richBodyHtml: mode === 'rich' ? body : null,
+    htmlSource: mode === 'html' ? body : null,
+    updatedAt: serverTimestamp(),
+  })
+}
+
+export const deleteMailTemplate = async (templateId) => {
+  await deleteDoc(doc(db, MAIL_TEMPLATES_COL, templateId))
 }

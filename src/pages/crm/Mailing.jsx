@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle, PenSquare } from 'lucide-react'
+import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle, PenSquare, Pencil, FileType } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -7,8 +7,10 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useGoogleOAuth } from '../../hooks/useGoogleOAuth'
 import {
   subscribeConnectedAccounts, connectGmailAccount, disconnectGmailAccount, subscribeMailingLogs,
+  subscribeMailTemplates, deleteMailTemplate,
 } from '../../services/mailing'
 import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
+import TemplateModal from '../../components/mailing/TemplateModal'
 
 function AccountRow({ account, onDisconnect }) {
   const [disconnecting, setDisconnecting] = useState(false)
@@ -83,6 +85,9 @@ export default function Mailing() {
   const [logs, setLogs] = useState([])
   const [connecting, setConnecting] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
+  const [templates, setTemplates] = useState([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState(null)
 
   useEffect(() => {
     if (!companyId) return
@@ -93,6 +98,12 @@ export default function Mailing() {
   useEffect(() => {
     if (!companyId) return
     const unsub = subscribeMailingLogs(companyId, setLogs)
+    return unsub
+  }, [companyId])
+
+  useEffect(() => {
+    if (!companyId) return
+    const unsub = subscribeMailTemplates(companyId, setTemplates)
     return unsub
   }, [companyId])
 
@@ -114,6 +125,16 @@ export default function Mailing() {
 
   const handleDisconnect = async (accountId) => {
     await disconnectGmailAccount(accountId)
+  }
+
+  const handleDeleteTemplate = async (templateId) => {
+    if (!window.confirm('¿Eliminar esta plantilla?')) return
+    try {
+      await deleteMailTemplate(templateId)
+      toast.success('Plantilla eliminada')
+    } catch (err) {
+      toast.error('Error al eliminar la plantilla')
+    }
   }
 
   return (
@@ -157,6 +178,41 @@ export default function Mailing() {
         </div>
 
         <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-brand-text">Plantillas</h2>
+            <button onClick={() => { setEditingTemplate(null); setShowTemplateModal(true) }} className="btn-primary text-xs px-3 py-1.5">
+              <FileType size={14} /> Nueva plantilla
+            </button>
+          </div>
+
+          {templates.length === 0 ? (
+            <div className="card p-6 text-center">
+              <p className="text-sm text-brand-text-muted">Todavía no creaste ninguna plantilla.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {templates.map((t) => (
+                <div key={t.id} className="flex items-center gap-3 px-4 py-3 border border-brand-border rounded-xl bg-white">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-brand-text truncate">{t.name}</p>
+                    <p className="text-xs text-brand-text-muted truncate">{t.subject}</p>
+                  </div>
+                  <span className="badge bg-brand-bg-2 text-brand-text-muted flex-shrink-0">
+                    {t.mode === 'html' ? 'HTML' : 'Visual'}
+                  </span>
+                  <button onClick={() => { setEditingTemplate(t); setShowTemplateModal(true) }} className="btn-ghost text-xs px-2 py-1.5 flex-shrink-0">
+                    <Pencil size={13} /> Editar
+                  </button>
+                  <button onClick={() => handleDeleteTemplate(t.id)} className="btn-ghost text-xs px-2 py-1.5 text-red-600 hover:bg-red-50 flex-shrink-0">
+                    <Trash2 size={13} /> Eliminar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
           <h2 className="text-sm font-semibold text-brand-text mb-3">Historial de envíos</h2>
           {sortedLogs.length === 0 ? (
             <div className="card p-6 text-center">
@@ -182,6 +238,13 @@ export default function Mailing() {
           )}
         </div>
       </div>
+
+      {showTemplateModal && (
+        <TemplateModal
+          template={editingTemplate}
+          onClose={() => { setShowTemplateModal(false); setEditingTemplate(null) }}
+        />
+      )}
 
       {showCompose && <ComposeEmailModal onClose={() => setShowCompose(false)} />}
     </div>
