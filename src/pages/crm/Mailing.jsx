@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react'
-import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle, PenSquare, Pencil, FileType, Megaphone } from 'lucide-react'
+import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, PenSquare, Pencil, FileType, Megaphone } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { useGoogleOAuth } from '../../hooks/useGoogleOAuth'
 import {
-  subscribeConnectedAccounts, connectGmailAccount, disconnectGmailAccount, subscribeMailingLogs,
-  subscribeMailTemplates, deleteMailTemplate,
+  subscribeConnectedAccounts, connectGmailAccount, disconnectGmailAccount,
+  subscribeMailTemplates, deleteMailTemplate, subscribeMailCampaigns,
 } from '../../services/mailing'
 import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
 import TemplateModal from '../../components/mailing/TemplateModal'
 import BulkSendPanel from '../../components/mailing/BulkSendPanel'
+import CampaignDetail from '../../components/mailing/CampaignDetail'
 
 function AccountRow({ account, onDisconnect }) {
   const [disconnecting, setDisconnecting] = useState(false)
@@ -55,41 +56,20 @@ function AccountRow({ account, onDisconnect }) {
   )
 }
 
-function LogRow({ log }) {
-  const date = log.createdAt?.toDate ? log.createdAt.toDate() : null
-  const isSent = log.status === 'sent'
-  return (
-    <tr className="border-b border-brand-border last:border-0">
-      <td className="px-3 py-2 text-xs text-brand-text-muted whitespace-nowrap">
-        {date ? format(date, "d MMM yyyy, HH:mm", { locale: es }) : '—'}
-      </td>
-      <td className="px-3 py-2 text-xs text-brand-text truncate max-w-[160px]">{log.fromEmail}</td>
-      <td className="px-3 py-2 text-xs text-brand-text truncate max-w-[160px]">{log.to}</td>
-      <td className="px-3 py-2 text-xs text-brand-text truncate max-w-[220px]">{log.subject}</td>
-      <td className="px-3 py-2 text-xs">
-        {isSent ? (
-          <span className="badge bg-green-100 text-green-700"><CheckCircle2 size={11} /> Enviado</span>
-        ) : (
-          <span className="badge bg-red-100 text-red-700"><XCircle size={11} /> Error</span>
-        )}
-      </td>
-    </tr>
-  )
-}
-
 export default function Mailing() {
   const { userProfile } = useAuth()
   const companyId = userProfile?.companyId
   const { requestGmailAuthCode } = useGoogleOAuth()
 
   const [accounts, setAccounts] = useState([])
-  const [logs, setLogs] = useState([])
   const [connecting, setConnecting] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
   const [showBulkSend, setShowBulkSend] = useState(false)
   const [templates, setTemplates] = useState([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
+  const [campaigns, setCampaigns] = useState([])
+  const [selectedCampaign, setSelectedCampaign] = useState(null)
 
   useEffect(() => {
     if (!companyId) return
@@ -99,7 +79,7 @@ export default function Mailing() {
 
   useEffect(() => {
     if (!companyId) return
-    const unsub = subscribeMailingLogs(companyId, setLogs)
+    const unsub = subscribeMailCampaigns(companyId, setCampaigns)
     return unsub
   }, [companyId])
 
@@ -109,7 +89,7 @@ export default function Mailing() {
     return unsub
   }, [companyId])
 
-  const sortedLogs = [...logs].sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
+  const sortedCampaigns = [...campaigns].sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0))
 
   const handleConnect = async () => {
     setConnecting(true)
@@ -226,7 +206,7 @@ export default function Mailing() {
 
         <div>
           <h2 className="text-sm font-semibold text-brand-text mb-3">Historial de envíos</h2>
-          {sortedLogs.length === 0 ? (
+          {sortedCampaigns.length === 0 ? (
             <div className="card p-6 text-center">
               <p className="text-sm text-brand-text-muted">Todavía no se envió ningún email.</p>
             </div>
@@ -236,14 +216,36 @@ export default function Mailing() {
                 <thead>
                   <tr className="border-b border-brand-border bg-brand-bg">
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Fecha</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">De</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Para</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Asunto</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Destinatarios</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Entregado</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Falló</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-brand-text-muted">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedLogs.map((log) => <LogRow key={log.id} log={log} />)}
+                  {sortedCampaigns.map((c) => {
+                    const date = c.createdAt?.toDate ? c.createdAt.toDate() : null
+                    const pct = (n) => c.recipientCount ? Math.round((n / c.recipientCount) * 100) : 0
+                    return (
+                      <tr key={c.id} onClick={() => setSelectedCampaign(c)} className="border-b border-brand-border last:border-0 hover:bg-brand-bg-2 cursor-pointer">
+                        <td className="px-3 py-2 text-xs text-brand-text-muted whitespace-nowrap">
+                          {date ? format(date, "d MMM yyyy, HH:mm", { locale: es }) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-brand-text truncate max-w-[220px]">{c.subject}</td>
+                        <td className="px-3 py-2 text-xs text-brand-text-muted">{c.recipientCount}</td>
+                        <td className="px-3 py-2 text-xs text-green-700 font-medium">{pct(c.sentCount)}%</td>
+                        <td className="px-3 py-2 text-xs text-red-600 font-medium">{pct(c.failedCount)}%</td>
+                        <td className="px-3 py-2 text-xs">
+                          {c.status === 'done' ? (
+                            <span className="badge bg-green-100 text-green-700"><CheckCircle2 size={11} /> Enviado</span>
+                          ) : (
+                            <span className="badge bg-amber-100 text-amber-700">Enviando...</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -261,6 +263,8 @@ export default function Mailing() {
       {showCompose && <ComposeEmailModal onClose={() => setShowCompose(false)} />}
 
       {showBulkSend && <BulkSendPanel onClose={() => setShowBulkSend(false)} />}
+
+      {selectedCampaign && <CampaignDetail campaign={selectedCampaign} onClose={() => setSelectedCampaign(null)} />}
     </div>
   )
 }

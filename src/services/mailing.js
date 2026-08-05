@@ -6,6 +6,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 const MAILING_SETTINGS_COL = 'mailingSettings'
 const MAILING_LOGS_COL = 'mailingLogs'
 const MAIL_TEMPLATES_COL = 'mailTemplates'
+const MAIL_CAMPAIGNS_COL = 'mailCampaigns'
 
 export const subscribeConnectedAccounts = (companyId, callback) => {
   const settingsRef = doc(db, MAILING_SETTINGS_COL, companyId)
@@ -102,4 +103,22 @@ export const updateMailTemplate = async (templateId, { name, subject, mode, body
 
 export const deleteMailTemplate = async (templateId) => {
   await deleteDoc(doc(db, MAIL_TEMPLATES_COL, templateId))
+}
+
+export const subscribeMailCampaigns = (companyId, callback) => {
+  const q = query(collection(db, MAIL_CAMPAIGNS_COL), where('companyId', '==', companyId))
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error('subscribeMailCampaigns error:', err)
+  )
+}
+
+export const subscribeCampaignLogs = (campaignId, callback) => {
+  const q = query(collection(db, MAILING_LOGS_COL), where('campaignId', '==', campaignId))
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    (err) => console.error('subscribeCampaignLogs error:', err)
+  )
 }
