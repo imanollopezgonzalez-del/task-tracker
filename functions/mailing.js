@@ -274,4 +274,120 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
   return { ok: true, logId: logRef.id, gmailMessageId, campaignId }
 })
 
-module.exports = { connectGmailAccount, disconnectGmailAccount, sendMail }
+// ---------------------------------------------------------------------------
+// sendBulkMail
+// ---------------------------------------------------------------------------
+function applyMergeFields(text, { nombre, empresa }) {
+  return (text || '')
+    .replaceAll('{{nombre}}', nombre || '')
+    .replaceAll('{{empresa}}', empresa || '')
+}
+
+const MAX_BULK_RECIPIENTS = 500
+
+const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds: 540 }, async (request) => {
+  const caller = await requireCrmUser(request.auth?.uid)
+  const { fromAccountId, subject, htmlBody, recipients, attachments, templateId, audienceType } = request.data || {}
+
+  if (!fromAccountId || !subject || !htmlBody || !Array.isArray(recipients) || recipients.length === 0) {
+    throw new HttpsError('invalid-argument', 'Faltan datos del envío masivo (cuenta, asunto, cuerpo o destinatarios)')
+  }
+  if (recipients.length > MAX_BULK_RECIPIENTS) {
+    throw new HttpsError('invalid-argument', `El envío masivo admite hasta ${MAX_BULK_RECIPIENTS} destinatarios (se recibieron ${recipients.length})`)
+  }
+  for (const r of recipients) {
+    if (typeof r?.email !== 'string' || !r.email.includes('@')) {
+      throw new HttpsError('invalid-argument', 'Hay un destinatario sin email válido')
+    }
+  }
+
+  const db = getFirestore()
+  const tokenRef = db.doc(`${MAILING_TOKENS_COL}/${fromAccountId}`)
+  const tokenSnap = await tokenRef.get()
+  if (!tokenSnap.exists || tokenSnap.data().companyId !== caller.companyId) {
+    throw new HttpsError('permission-denied', 'La cuenta de envío no es válida')
+  }
+  const { refreshToken, email: fromEmail } = tokenSnap.data()
+
+  const oauth2Client = createOAuth2Client(GOOGLE_OAUTH_CLIENT_SECRET.value())
+  oauth2Client.setCredentials({ refresh_token: refreshToken })
+
+  try {
+    await oauth2Client.refreshAccessToken()
+  } catch (err) {
+    console.error('sendBulkMail: refreshAccessToken failed', err.message)
+    throw new HttpsError('failed-precondition', 'La cuenta de Gmail necesita reconectarse desde /crm/mailing')
+  }
+
+  // Adjuntos: se descargan una sola vez de Storage y se reusan en cada envío individual
+  const attachmentsPrefix = `mailing/${caller.companyId}/attachments/`
+  const bucket = getStorage().bucket()
+  const mailAttachments = []
+  for (const att of attachments || []) {
+    if (typeof att.path !== 'string' || !att.path.startsWith(attachmentsPrefix)) {
+      throw new HttpsError('invalid-argument', `Adjunto inválido: "${att.filename}"`)
+    }
+    try {
+      const [buffer] = await bucket.file(att.path).download()
+      mailAttachments.push({ filename: att.filename, content: buffer, contentType: att.mimeType })
+    } catch (err) {
+      console.error('sendBulkMail: no se pudo leer adjunto', att.filename, err.message)
+      throw new HttpsError('internal', `No se pudo adjuntar el archivo "${att.filename}"`)
+    }
+  }
+
+  const campaignId = await createMailCampaign(db, {
+    companyId: caller.companyId, subject, fromAccountId, fromEmail,
+    sentBy: caller.uid, sentByName: caller.displayName,
+    templateId, audienceType, recipientCount: recipients.length,
+  })
+
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client })
+
+  for (const recipient of recipients) {
+    const personalizedSubject = applyMergeFields(subject, recipient)
+    const personalizedBody = applyMergeFields(htmlBody, recipient)
+    const logBase = {
+      companyId: caller.companyId,
+      fromAccountId,
+      fromEmail,
+      to: recipient.email,
+      subject: personalizedSubject,
+      htmlBody: personalizedBody,
+      hasAttachments: mailAttachments.length > 0,
+      leadId: recipient.leadId || null,
+      campaignId,
+      sentBy: caller.uid,
+      sentByName: caller.displayName,
+      createdAt: FieldValue.serverTimestamp(),
+    }
+
+    try {
+      const mail = new MailComposer({
+        from: fromEmail,
+        to: recipient.email,
+        subject: personalizedSubject,
+        html: personalizedBody,
+        attachments: mailAttachments,
+      })
+      const mimeMessage = await new Promise((resolve, reject) => {
+        mail.compile().build((err, message) => (err ? reject(err) : resolve(message)))
+      })
+      const raw = mimeMessage.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
+      const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'sent', gmailMessageId: res.data.id })
+      await bumpCampaignCounter(db, campaignId, 'sentCount')
+    } catch (err) {
+      console.error('sendBulkMail: fallo el envío a', recipient.email, err.message)
+      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: err.message || 'send_failed' })
+      await bumpCampaignCounter(db, campaignId, 'failedCount')
+    }
+  }
+
+  await finishCampaign(db, campaignId)
+
+  return { ok: true, campaignId }
+})
+
+module.exports = { connectGmailAccount, disconnectGmailAccount, sendMail, sendBulkMail }
