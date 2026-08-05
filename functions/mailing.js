@@ -13,6 +13,32 @@ const GOOGLE_OAUTH_CLIENT_SECRET = defineSecret('GOOGLE_OAUTH_CLIENT_SECRET')
 const MAILING_TOKENS_COL = 'mailingTokens'
 const MAILING_SETTINGS_COL = 'mailingSettings'
 const MAILING_LOGS_COL = 'mailingLogs'
+const MAILING_CAMPAIGNS_COL = 'mailCampaigns'
+
+async function createMailCampaign(db, {
+  companyId, subject, fromAccountId, fromEmail, sentBy, sentByName,
+  templateId, audienceType, recipientCount,
+}) {
+  const ref = await db.collection(MAILING_CAMPAIGNS_COL).add({
+    companyId, subject, fromAccountId, fromEmail, sentBy, sentByName,
+    templateId: templateId || null,
+    audienceType: audienceType || 'individual',
+    recipientCount,
+    sentCount: 0,
+    failedCount: 0,
+    status: 'sending',
+    createdAt: FieldValue.serverTimestamp(),
+  })
+  return ref.id
+}
+
+async function bumpCampaignCounter(db, campaignId, field) {
+  await db.doc(`${MAILING_CAMPAIGNS_COL}/${campaignId}`).update({ [field]: FieldValue.increment(1) })
+}
+
+async function finishCampaign(db, campaignId) {
+  await db.doc(`${MAILING_CAMPAIGNS_COL}/${campaignId}`).update({ status: 'done' })
+}
 
 // ---------------------------------------------------------------------------
 // connectGmailAccount
@@ -147,6 +173,12 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
   const oauth2Client = createOAuth2Client(GOOGLE_OAUTH_CLIENT_SECRET.value())
   oauth2Client.setCredentials({ refresh_token: refreshToken })
 
+  const campaignId = await createMailCampaign(db, {
+    companyId: caller.companyId, subject, fromAccountId, fromEmail,
+    sentBy: caller.uid, sentByName: caller.displayName,
+    audienceType: 'individual', recipientCount: 1,
+  })
+
   const logBase = {
     companyId: caller.companyId,
     fromAccountId,
@@ -156,16 +188,23 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
     htmlBody,
     hasAttachments: Array.isArray(attachments) && attachments.length > 0,
     leadId: leadId || null,
+    campaignId,
     sentBy: caller.uid,
     sentByName: caller.displayName,
     createdAt: FieldValue.serverTimestamp(),
+  }
+
+  const fail = async (errorMessage) => {
+    await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage })
+    await bumpCampaignCounter(db, campaignId, 'failedCount')
+    await finishCampaign(db, campaignId)
   }
 
   try {
     await oauth2Client.refreshAccessToken()
   } catch (err) {
     console.error('sendMail: refreshAccessToken failed', err.message)
-    await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: 'reauth_required' })
+    await fail('reauth_required')
     const settingsRef = db.doc(`${MAILING_SETTINGS_COL}/${caller.companyId}`)
     const settingsSnap = await settingsRef.get()
     if (settingsSnap.exists) {
@@ -185,6 +224,7 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
   const mailAttachments = []
   for (const att of attachments || []) {
     if (typeof att.path !== 'string' || !att.path.startsWith(attachmentsPrefix)) {
+      await fail('invalid_attachment')
       throw new HttpsError('invalid-argument', `Adjunto inválido: "${att.filename}"`)
     }
     try {
@@ -192,6 +232,7 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
       mailAttachments.push({ filename: att.filename, content: buffer, contentType: att.mimeType })
     } catch (err) {
       console.error('sendMail: no se pudo leer adjunto', att.filename, err.message)
+      await fail('attachment_read_failed')
       throw new HttpsError('internal', `No se pudo adjuntar el archivo "${att.filename}"`)
     }
   }
@@ -211,7 +252,7 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
     raw = mimeMessage.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
   } catch (err) {
     console.error('sendMail: MIME build failed', err)
-    await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: 'mime_build_failed' })
+    await fail('mime_build_failed')
     throw new HttpsError('internal', 'No se pudo armar el email')
   }
 
@@ -222,13 +263,15 @@ const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds:
     gmailMessageId = res.data.id
   } catch (err) {
     console.error('sendMail: gmail send failed', err)
-    await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: 'gmail_send_failed' })
+    await fail('gmail_send_failed')
     throw new HttpsError('internal', 'Gmail rechazó el envío del email')
   }
 
   const logRef = await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'sent', gmailMessageId })
+  await bumpCampaignCounter(db, campaignId, 'sentCount')
+  await finishCampaign(db, campaignId)
 
-  return { ok: true, logId: logRef.id, gmailMessageId }
+  return { ok: true, logId: logRef.id, gmailMessageId, campaignId }
 })
 
 module.exports = { connectGmailAccount, disconnectGmailAccount, sendMail }
