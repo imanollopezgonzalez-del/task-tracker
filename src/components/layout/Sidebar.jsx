@@ -8,6 +8,7 @@ import toast from 'react-hot-toast'
 const MEMBER_NAV = [
   { to: '/tasks', icon: CheckSquare, label: 'Tareas', end: true },
   { to: '/calendar', icon: Calendar, label: 'Calendario' },
+  { to: '/settings', icon: Settings, label: 'Ajustes' },
 ]
 
 const ADMIN_NAV = [
