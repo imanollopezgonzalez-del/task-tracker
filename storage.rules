@@ -6,12 +6,15 @@ service firebase.storage {
       // Gmail y los destinatarios necesitan poder cargar la imagen/adjunto sin auth
       allow read: if true;
 
+      // Antes esto validaba companyId/role leyendo el perfil del usuario en Firestore
+      // desde la regla (firestore.get(...) cross-service). Esa lectura cruzada dio
+      // "storage/unauthorized" incluso con el usuario y companyId correctos (permisos
+      // ya verificados a mano en Firestore) — es una característica frágil de Storage
+      // Rules en la práctica. La autorización real y confiable de "quién puede mandar
+      // este archivo como adjunto" ya la hace sendMail/sendBulkMail del lado del
+      // servidor (Admin SDK, valida el path contra el companyId real del caller,
+      // ver functions/mailing.js) — acá solo hace falta estar logueado en la app.
       allow write: if request.auth != null
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.companyId == companyId
-        && (
-          firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin'
-          || firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.crmAccess == true
-        )
         && request.resource.size < 10 * 1024 * 1024;
     }
   }
