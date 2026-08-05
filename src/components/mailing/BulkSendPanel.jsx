@@ -247,13 +247,13 @@ export default function BulkSendPanel({ onClose }) {
             {pickedTemplateMode === 'html' ? (
               <div className="border border-brand-border rounded-lg overflow-hidden">
                 <div className="px-3 py-1.5 bg-amber-50 border-b border-brand-border text-[11px] text-amber-800">
-                  Plantilla HTML — se envía tal cual, sin editar acá
+                  Vista previa — plantilla HTML, se envía tal cual, sin editar acá
                 </div>
-                <textarea
-                  className="w-full font-mono text-xs px-3 py-2.5 max-h-64 h-64 resize-y bg-brand-bg-2 text-brand-text-muted"
-                  value={htmlSourceOverride || ''}
-                  readOnly
-                  disabled
+                <iframe
+                  title="Vista previa del email"
+                  srcDoc={htmlSourceOverride || ''}
+                  sandbox=""
+                  className="w-full h-96 bg-white"
                 />
               </div>
             ) : (
