@@ -292,11 +292,15 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
   if (!fromAccountId || !subject || !htmlBody || !Array.isArray(recipients) || recipients.length === 0) {
     throw new HttpsError('invalid-argument', 'Faltan datos del envío masivo (cuenta, asunto, cuerpo o destinatarios)')
   }
+  if (typeof subject !== 'string' || typeof htmlBody !== 'string') {
+    throw new HttpsError('invalid-argument', 'El asunto y el cuerpo del email deben ser texto')
+  }
   if (recipients.length > MAX_BULK_RECIPIENTS) {
     throw new HttpsError('invalid-argument', `El envío masivo admite hasta ${MAX_BULK_RECIPIENTS} destinatarios (se recibieron ${recipients.length})`)
   }
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   for (const r of recipients) {
-    if (typeof r?.email !== 'string' || !r.email.includes('@')) {
+    if (typeof r?.email !== 'string' || !EMAIL_RE.test(r.email)) {
       throw new HttpsError('invalid-argument', 'Hay un destinatario sin email válido')
     }
   }
