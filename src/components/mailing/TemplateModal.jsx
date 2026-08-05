@@ -22,7 +22,11 @@ export default function TemplateModal({ template = null, onClose }) {
     if (!name.trim()) { toast.error('Falta el nombre de la plantilla'); return }
     if (!subject.trim()) { toast.error('Falta el asunto'); return }
     const body = mode === 'rich' ? (editor?.getHTML() || '') : htmlSource
-    if (!body.trim()) { toast.error('Falta el contenido del email'); return }
+    // El HTML "vacío" de Tiptap es "<p></p>", que no es "" y pasa un chequeo con .trim().
+    // Usamos editor.isEmpty para detectar de verdad un documento vacío (evita pisar un
+    // htmlSource con contenido real si el usuario toca "Editor visual" por error).
+    const isEmpty = mode === 'rich' ? (editor?.isEmpty ?? true) : !htmlSource.trim()
+    if (isEmpty) { toast.error('Falta el contenido del email'); return }
 
     setSaving(true)
     try {

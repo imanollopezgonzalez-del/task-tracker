@@ -35,7 +35,10 @@ export const sendEmail = async ({ fromAccountId, to, subject, htmlBody, attachme
 }
 
 export const sendBulkEmail = async ({ fromAccountId, subject, htmlBody, recipients, attachments, templateId, audienceType }) => {
-  const fn = httpsCallable(functions, 'sendBulkMail')
+  // El server (sendBulkMail) puede tardar hasta timeoutSeconds: 540 con listas grandes.
+  // El default del cliente (~70s) cortaría antes de que termine el server y mostraría
+  // un error falso, incentivando un reintento que duplicaría el envío masivo.
+  const fn = httpsCallable(functions, 'sendBulkMail', { timeout: 540000 })
   const res = await fn({ fromAccountId, subject, htmlBody, recipients, attachments, templateId, audienceType })
   return res.data
 }
@@ -114,8 +117,12 @@ export const subscribeMailCampaigns = (companyId, callback) => {
   )
 }
 
-export const subscribeCampaignLogs = (campaignId, callback) => {
-  const q = query(collection(db, MAILING_LOGS_COL), where('campaignId', '==', campaignId))
+export const subscribeCampaignLogs = (companyId, campaignId, callback) => {
+  const q = query(
+    collection(db, MAILING_LOGS_COL),
+    where('companyId', '==', companyId),
+    where('campaignId', '==', campaignId)
+  )
   return onSnapshot(
     q,
     (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),

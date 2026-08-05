@@ -17,6 +17,8 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   const [attachments, setAttachments] = useState([])
   const [sending, setSending] = useState(false)
   const [templates, setTemplates] = useState([])
+  const [pickedTemplateMode, setPickedTemplateMode] = useState(null) // 'rich' | 'html' | null
+  const [htmlSourceOverride, setHtmlSourceOverride] = useState(null)
 
   useEffect(() => {
     if (!companyId) return
@@ -36,11 +38,25 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   const { editor, handlePickImage } = useMailEditor({ companyId })
 
   const handlePickTemplate = (id) => {
+    if (!id) {
+      setPickedTemplateMode(null)
+      setHtmlSourceOverride(null)
+      editor?.commands.setContent('')
+      return
+    }
     const t = templates.find((tpl) => tpl.id === id)
     if (!t) return
     setSubject(t.subject)
-    const html = t.mode === 'html' ? t.htmlSource : t.richBodyHtml
-    editor?.commands.setContent(html || '')
+    if (t.mode === 'html') {
+      // HTML pegado (Beefree, etc.): NO pasa por el schema de Tiptap, se guarda tal cual
+      // y se manda byte-a-byte en el envío para no perder estilos/tablas.
+      setPickedTemplateMode('html')
+      setHtmlSourceOverride(t.htmlSource || '')
+    } else {
+      setPickedTemplateMode('rich')
+      setHtmlSourceOverride(null)
+      editor?.commands.setContent(t.richBodyHtml || '')
+    }
   }
 
   const handlePickAttachment = () => {
@@ -73,11 +89,12 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
 
     setSending(true)
     try {
+      const htmlBody = htmlSourceOverride != null ? htmlSourceOverride : (editor?.getHTML() || '')
       await sendEmail({
         fromAccountId,
         to: toValue.trim(),
         subject: subject.trim(),
-        htmlBody: editor?.getHTML() || '',
+        htmlBody,
         attachments: attachments.map(({ filename, path, mimeType }) => ({ filename, path, mimeType })),
         leadId,
       })
@@ -142,12 +159,26 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
 
           <div>
             <label className="label">Mensaje</label>
-            <div className="border border-brand-border rounded-lg overflow-hidden">
-              <EmailEditorToolbar editor={editor} onPickImage={handlePickImage} />
-              <div className="mail-editor-content px-3 py-2.5 max-h-64 overflow-y-auto" onClick={() => editor?.chain().focus().run()}>
-                <EditorContent editor={editor} />
+            {pickedTemplateMode === 'html' ? (
+              <div className="border border-brand-border rounded-lg overflow-hidden">
+                <div className="px-3 py-1.5 bg-amber-50 border-b border-brand-border text-[11px] text-amber-800">
+                  Plantilla HTML — se envía tal cual, sin editar acá
+                </div>
+                <textarea
+                  className="w-full font-mono text-xs px-3 py-2.5 max-h-64 h-64 resize-y bg-brand-bg-2 text-brand-text-muted"
+                  value={htmlSourceOverride || ''}
+                  readOnly
+                  disabled
+                />
               </div>
-            </div>
+            ) : (
+              <div className="border border-brand-border rounded-lg overflow-hidden">
+                <EmailEditorToolbar editor={editor} onPickImage={handlePickImage} />
+                <div className="mail-editor-content px-3 py-2.5 max-h-64 overflow-y-auto" onClick={() => editor?.chain().focus().run()}>
+                  <EditorContent editor={editor} />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

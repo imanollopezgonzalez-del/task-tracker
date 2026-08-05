@@ -33,7 +33,13 @@ async function createMailCampaign(db, {
 }
 
 async function bumpCampaignCounter(db, campaignId, field) {
-  await db.doc(`${MAILING_CAMPAIGNS_COL}/${campaignId}`).update({ [field]: FieldValue.increment(1) })
+  // updatedAt funciona como heartbeat: si la instancia de la función muere a mitad del loop
+  // (p. ej. hard timeout de 540s en una campaña muy grande), el cliente puede detectar que
+  // la campaña quedó "trabada" comparando este timestamp contra el momento actual.
+  await db.doc(`${MAILING_CAMPAIGNS_COL}/${campaignId}`).update({
+    [field]: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
 }
 
 async function finishCampaign(db, campaignId) {
@@ -351,13 +357,16 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
   for (const recipient of recipients) {
     const personalizedSubject = applyMergeFields(subject, recipient)
     const personalizedBody = applyMergeFields(htmlBody, recipient)
+    // No guardamos htmlBody acá (a diferencia de sendMail): con plantillas HTML reales de
+    // 50-100KB+ y hasta 500 destinatarios, escribir el cuerpo completo en cada log individual
+    // puede acercarse o superar el límite de 1 MiB por documento de Firestore y arriesga
+    // hacer fallar la campaña entera escritura por escritura. El subject es chico, se guarda igual.
     const logBase = {
       companyId: caller.companyId,
       fromAccountId,
       fromEmail,
       to: recipient.email,
       subject: personalizedSubject,
-      htmlBody: personalizedBody,
       hasAttachments: mailAttachments.length > 0,
       leadId: recipient.leadId || null,
       campaignId,
@@ -366,25 +375,48 @@ const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeco
       createdAt: FieldValue.serverTimestamp(),
     }
 
-    try {
-      const mail = new MailComposer({
-        from: fromEmail,
-        to: recipient.email,
-        subject: personalizedSubject,
-        html: personalizedBody,
-        attachments: mailAttachments,
-      })
-      const mimeMessage = await new Promise((resolve, reject) => {
-        mail.compile().build((err, message) => (err ? reject(err) : resolve(message)))
-      })
-      const raw = mimeMessage.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    let sendErr = null
+    let gmailMessageId = null
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const mail = new MailComposer({
+          from: fromEmail,
+          to: recipient.email,
+          subject: personalizedSubject,
+          html: personalizedBody,
+          attachments: mailAttachments,
+        })
+        const mimeMessage = await new Promise((resolve, reject) => {
+          mail.compile().build((err, message) => (err ? reject(err) : resolve(message)))
+        })
+        const raw = mimeMessage.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 
-      const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
-      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'sent', gmailMessageId: res.data.id })
+        const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } })
+        gmailMessageId = res.data.id
+        sendErr = null
+        break
+      } catch (err) {
+        sendErr = err
+        // googleapis (gaxios) expone el status HTTP como err.response.status (number) o,
+        // según la versión/tipo de error, como err.code (a veces string). Normalizamos.
+        const rawStatus = err.response?.status ?? err.code
+        const status = typeof rawStatus === 'string' ? parseInt(rawStatus, 10) : rawStatus
+        const isTransient = status === 429 || (typeof status === 'number' && !Number.isNaN(status) && status >= 500 && status < 600)
+        if (isTransient && attempt === 0) {
+          console.warn('sendBulkMail: error transitorio con', recipient.email, '- reintentando en 1s', status || err.message)
+          await new Promise((r) => setTimeout(r, 1000))
+          continue
+        }
+        break
+      }
+    }
+
+    if (!sendErr) {
+      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'sent', gmailMessageId })
       await bumpCampaignCounter(db, campaignId, 'sentCount')
-    } catch (err) {
-      console.error('sendBulkMail: fallo el envío a', recipient.email, err.message)
-      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: err.message || 'send_failed' })
+    } else {
+      console.error('sendBulkMail: fallo el envío a', recipient.email, sendErr.message)
+      await db.collection(MAILING_LOGS_COL).add({ ...logBase, status: 'error', errorMessage: sendErr.message || 'send_failed' })
       await bumpCampaignCounter(db, campaignId, 'failedCount')
     }
   }

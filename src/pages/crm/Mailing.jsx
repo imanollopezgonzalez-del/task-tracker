@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, PenSquare, Pencil, FileType, Megaphone } from 'lucide-react'
+import { isCampaignStuck } from '../../utils/mailingCampaign'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -239,6 +240,8 @@ export default function Mailing() {
                         <td className="px-3 py-2 text-xs">
                           {c.status === 'done' ? (
                             <span className="badge bg-green-100 text-green-700"><CheckCircle2 size={11} /> Enviado</span>
+                          ) : isCampaignStuck(c) ? (
+                            <span className="badge bg-red-100 text-red-700"><AlertTriangle size={11} /> Interrumpido</span>
                           ) : (
                             <span className="badge bg-amber-100 text-amber-700">Enviando...</span>
                           )}

@@ -26,6 +26,8 @@ export default function BulkSendPanel({ onClose }) {
   const [templateId, setTemplateId] = useState('')
   const [subject, setSubject] = useState('')
   const [sending, setSending] = useState(false)
+  const [pickedTemplateMode, setPickedTemplateMode] = useState(null) // 'rich' | 'html' | null
+  const [htmlSourceOverride, setHtmlSourceOverride] = useState(null)
 
   const { editor, handlePickImage } = useMailEditor({ companyId })
 
@@ -68,11 +70,26 @@ export default function BulkSendPanel({ onClose }) {
 
   const handlePickTemplate = (id) => {
     setTemplateId(id)
+    if (!id) {
+      // "Escribir desde cero": volvemos al editor Tiptap normal
+      setPickedTemplateMode(null)
+      setHtmlSourceOverride(null)
+      editor?.commands.setContent('')
+      return
+    }
     const t = templates.find((tpl) => tpl.id === id)
     if (!t) return
     setSubject(t.subject)
-    const html = t.mode === 'html' ? t.htmlSource : t.richBodyHtml
-    editor?.commands.setContent(html || '')
+    if (t.mode === 'html') {
+      // HTML pegado (Beefree, etc.): NO pasa por el schema de Tiptap, se guarda tal cual
+      // y se manda byte-a-byte en el envío para no perder estilos/tablas.
+      setPickedTemplateMode('html')
+      setHtmlSourceOverride(t.htmlSource || '')
+    } else {
+      setPickedTemplateMode('rich')
+      setHtmlSourceOverride(null)
+      editor?.commands.setContent(t.richBodyHtml || '')
+    }
   }
 
   const overLimit = audience.recipients.length > MAX_RECIPIENTS
@@ -85,25 +102,54 @@ export default function BulkSendPanel({ onClose }) {
 
     if (!window.confirm(`¿Enviar este email a ${audience.recipients.length} destinatarios?`)) return
 
+    // Si hay una plantilla HTML cargada, se manda tal cual (sin pasar por el editor Tiptap,
+    // que solo entiende su propio schema y destruiría estilos/tablas).
+    const htmlBody = htmlSourceOverride != null ? htmlSourceOverride : (editor?.getHTML() || '')
+
     setSending(true)
-    try {
-      const htmlBody = editor?.getHTML() || ''
-      await sendBulkEmail({
-        fromAccountId,
-        subject: subject.trim(),
-        htmlBody,
-        recipients: audience.recipients,
-        templateId: templateId || null,
-        audienceType,
-      })
-      toast.success(`Envío masivo lanzado a ${audience.recipients.length} destinatarios`)
-      onClose()
-    } catch (err) {
-      console.error(err)
-      toast.error(err.message || 'Error al lanzar el envío masivo')
-    } finally {
+
+    // El server puede tardar varios minutos con listas grandes (timeoutSeconds: 540) y no
+    // tiene sentido bloquear el modal esperando el loop completo — el progreso ya se ve en
+    // vivo en el historial (sentCount/failedCount/status vía onSnapshot). Pero las fallas de
+    // validación del server (cuenta inválida, email mal formado, etc.) ocurren rápido, antes
+    // de mandar ningún mail, y esas sí queremos mostrarlas en el modal antes de cerrarlo.
+    // Truco: le damos una ventana corta a la promesa para que se resuelva/rechace; si no lo
+    // hace a tiempo asumimos que ya está mandando de verdad y dejamos de esperar.
+    const FAST_FAIL_WINDOW_MS = 4000
+    const TIMEOUT = Symbol('timeout')
+    const sendPromise = sendBulkEmail({
+      fromAccountId,
+      subject: subject.trim(),
+      htmlBody,
+      recipients: audience.recipients,
+      templateId: templateId || null,
+      audienceType,
+    })
+
+    const raced = await Promise.race([
+      sendPromise.then(() => ({ ok: true })).catch((err) => ({ ok: false, err })),
+      new Promise((resolve) => setTimeout(() => resolve(TIMEOUT), FAST_FAIL_WINDOW_MS)),
+    ])
+
+    if (raced !== TIMEOUT && raced.ok === false) {
+      console.error(raced.err)
+      toast.error(raced.err.message || 'Error al lanzar el envío masivo')
       setSending(false)
+      return
     }
+
+    // Ya sea que resolvió rápido o que superó la ventana de "fast fail": lo tratamos como
+    // dispatchado al server. Si todavía está corriendo, seguimos escuchando el resultado
+    // en segundo plano solo para loguear/avisar una falla real (no bloqueamos la UI).
+    if (raced === TIMEOUT) {
+      sendPromise.catch((err) => {
+        console.error(err)
+        toast.error(err.message || 'Error al enviar la campaña')
+      })
+    }
+    toast.success('Envío masivo iniciado — mirá el progreso en el historial')
+    setSending(false)
+    onClose()
   }
 
   return (
@@ -198,12 +244,26 @@ export default function BulkSendPanel({ onClose }) {
 
           <div>
             <label className="label">Mensaje</label>
-            <div className="border border-brand-border rounded-lg overflow-hidden">
-              <EmailEditorToolbar editor={editor} onPickImage={handlePickImage} mergeFields />
-              <div className="mail-editor-content px-3 py-2.5 max-h-64 overflow-y-auto" onClick={() => editor?.chain().focus().run()}>
-                <EditorContent editor={editor} />
+            {pickedTemplateMode === 'html' ? (
+              <div className="border border-brand-border rounded-lg overflow-hidden">
+                <div className="px-3 py-1.5 bg-amber-50 border-b border-brand-border text-[11px] text-amber-800">
+                  Plantilla HTML — se envía tal cual, sin editar acá
+                </div>
+                <textarea
+                  className="w-full font-mono text-xs px-3 py-2.5 max-h-64 h-64 resize-y bg-brand-bg-2 text-brand-text-muted"
+                  value={htmlSourceOverride || ''}
+                  readOnly
+                  disabled
+                />
               </div>
-            </div>
+            ) : (
+              <div className="border border-brand-border rounded-lg overflow-hidden">
+                <EmailEditorToolbar editor={editor} onPickImage={handlePickImage} mergeFields />
+                <div className="mail-editor-content px-3 py-2.5 max-h-64 overflow-y-auto" onClick={() => editor?.chain().focus().run()}>
+                  <EditorContent editor={editor} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

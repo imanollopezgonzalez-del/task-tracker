@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { X, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { subscribeCampaignLogs } from '../../services/mailing'
+import { isCampaignStuck } from '../../utils/mailingCampaign'
 
 function LogGroup({ title, logs, color }) {
   const [open, setOpen] = useState(false)
@@ -29,9 +30,9 @@ export default function CampaignDetail({ campaign, onClose }) {
   const [logs, setLogs] = useState([])
 
   useEffect(() => {
-    const unsub = subscribeCampaignLogs(campaign.id, setLogs)
+    const unsub = subscribeCampaignLogs(campaign.companyId, campaign.id, setLogs)
     return unsub
-  }, [campaign.id])
+  }, [campaign.companyId, campaign.id])
 
   const sent = logs.filter((l) => l.status === 'sent')
   const failed = logs.filter((l) => l.status === 'error')
@@ -67,6 +68,15 @@ export default function CampaignDetail({ campaign, onClose }) {
         <div className="px-6 py-3 text-xs text-brand-text-muted border-b border-brand-border space-y-1">
           <p>Enviado por <span className="font-medium text-brand-text">{campaign.sentByName}</span> desde {campaign.fromEmail}</p>
           {date && <p>{format(date, "d 'de' MMMM yyyy, HH:mm", { locale: es })}</p>}
+          {campaign.status === 'sending' && (
+            isCampaignStuck(campaign) ? (
+              <p className="flex items-center gap-1 font-medium text-red-600">
+                <AlertTriangle size={12} /> Interrumpido — no hubo actividad en los últimos 5 minutos, puede haber quedado a mitad de camino.
+              </p>
+            ) : (
+              <p className="font-medium text-amber-600">Enviando...</p>
+            )
+          )}
         </div>
 
         <div className="overflow-y-auto flex-1">
