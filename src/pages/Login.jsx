@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { AlertCircle } from 'lucide-react'
+import { buildUserEmail } from '../services/users'
+import { Eye, EyeOff, AlertCircle } from 'lucide-react'
 import Spinner from '../components/ui/Spinner'
 
 function GoogleIcon(props) {
@@ -15,26 +16,39 @@ function GoogleIcon(props) {
   )
 }
 
+// NOTA: el login con usuario+PIN quedó temporalmente restaurado como red de seguridad
+// mientras se termina de habilitar el login con Google (dominio autorizado en Firebase +
+// cuentas vinculadas de cada usuario). Sacarlo de nuevo recién cuando Google funcione de
+// punta a punta para todo el equipo.
 export default function Login() {
+  const [showPwd, setShowPwd] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState('')
+  const [username, setUsername] = useState('')
+  const [pin, setPin] = useState('')
 
-  const { loginWithGoogle } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
   const navigate = useNavigate()
+
+  const clear = () => setError('')
 
   const getErrorMsg = (code, message) => {
     switch (code) {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found': return 'Usuario o PIN incorrecto'
+      case 'auth/too-many-requests': return 'Demasiados intentos. Espera unos minutos.'
+      case 'auth/network-request-failed': return 'Sin conexión. Revisa tu internet.'
       case 'auth/popup-closed-by-user':
       case 'auth/cancelled-popup-request': return ''
-      case 'auth/network-request-failed': return 'Sin conexión. Revisa tu internet.'
-      case 'auth/too-many-requests': return 'Demasiados intentos. Espera unos minutos.'
       case 'auth/google-not-authorized': return message
       default: return message || 'Algo salió mal. Inténtalo de nuevo.'
     }
   }
 
   const handleGoogleLogin = async () => {
-    setError('')
+    clear()
     setGoogleLoading(true)
     try {
       await loginWithGoogle()
@@ -43,6 +57,20 @@ export default function Login() {
       const msg = getErrorMsg(err.code, err.message)
       if (msg) setError(msg)
     } finally { setGoogleLoading(false) }
+  }
+
+  const handleLogin = async (e) => {
+    e.preventDefault()
+    clear()
+    if (!username.trim()) { setError('Escribe tu nombre de usuario'); return }
+    if (pin.length !== 6) { setError('El PIN debe tener 6 dígitos'); return }
+    setLoading(true)
+    try {
+      await login(buildUserEmail(username), pin)
+      navigate('/')
+    } catch (err) {
+      setError(getErrorMsg(err.code, err.message))
+    } finally { setLoading(false) }
   }
 
   return (
@@ -72,6 +100,35 @@ export default function Login() {
           >
             {googleLoading ? <Spinner size="sm" /> : <><GoogleIcon /> Continuar con Google</>}
           </button>
+
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-brand-border" />
+            <span className="text-xs text-brand-text-light">o con usuario y PIN</span>
+            <div className="flex-1 h-px bg-brand-border" />
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="label">Nombre de usuario</label>
+              <input type="text" autoComplete="username" className="input-field" placeholder="Ej: Imanol"
+                value={username} onChange={(e) => { clear(); setUsername(e.target.value) }} />
+            </div>
+            <div>
+              <label className="label">PIN <span className="normal-case font-normal text-brand-text-light">(6 dígitos)</span></label>
+              <div className="relative">
+                <input type={showPwd ? 'text' : 'password'} inputMode="numeric" maxLength={6}
+                  className="input-field pr-10 tracking-widest text-xl text-center" placeholder="······"
+                  value={pin} onChange={(e) => { clear(); setPin(e.target.value.replace(/\D/g, '').slice(0, 6)) }} />
+                <button type="button" onClick={() => setShowPwd(!showPwd)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-brand-text">
+                  {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+            <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">
+              {loading ? <Spinner size="sm" /> : 'Entrar'}
+            </button>
+          </form>
         </div>
         <p className="text-center text-xs text-brand-text-muted mt-4">Doble control · Seguimiento de equipos</p>
       </div>
