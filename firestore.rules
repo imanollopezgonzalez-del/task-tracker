@@ -81,5 +81,16 @@ service cloud.firestore {
       allow read: if hasCrm() && myCompany() == resource.data.companyId;
       allow create, update, delete: if false; // solo Cloud Functions (Admin SDK)
     }
+
+    match /mailTemplates/{templateId} {
+      allow read: if hasCrm() && myCompany() == resource.data.companyId;
+      allow create: if hasCrm() && myCompany() == request.resource.data.companyId;
+      allow update, delete: if hasCrm() && myCompany() == resource.data.companyId;
+    }
+
+    match /mailCampaigns/{campaignId} {
+      allow read: if hasCrm() && myCompany() == resource.data.companyId;
+      allow create, update, delete: if false; // solo Cloud Functions (Admin SDK)
+    }
   }
 }
