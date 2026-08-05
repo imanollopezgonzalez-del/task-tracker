@@ -11,7 +11,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
-import { format, subMonths, endOfMonth } from 'date-fns'
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Settings2, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -231,22 +231,27 @@ export default function Panel() {
       fill: v.kanban,
     })).filter((d) => d.value > 0), [contactos])
 
-  // Widget: objetivo de kg del mes/año elegidos en el propio widget
+  // Widget: objetivo de kg del mes/año elegidos (siguen a los filtros globales, ver arriba).
+  // Cuenta kg de clientes CERRADOS DENTRO de ese mes puntual (no acumulado de meses
+  // anteriores) — coincide con que el objetivo cargado en ObjetivosModal cambia mes a mes
+  // (ej. 500kg en julio, 250kg en agosto): es una meta de cierre nuevo por mes, no un piso
+  // de cartera activa total.
   const mesKey = `${objAno}-${objMes}`
   const mesLabel = format(new Date(`${mesKey}-01T12:00:00`), 'MMMM yyyy', { locale: es })
   const objetivosMes = objetivos[mesKey] || {}
+  const mesInicio = useMemo(() => startOfMonth(new Date(`${mesKey}-01T12:00:00`)), [mesKey])
   const mesFin = useMemo(() => endOfMonth(new Date(`${mesKey}-01T12:00:00`)), [mesKey])
 
   const clientesActivosEnMes = useMemo(() => clientesBase.filter((c) => {
     if (!c.fechaCierre) return false
     const cierre = new Date(c.fechaCierre + 'T12:00:00')
-    if (cierre > mesFin) return false
+    if (cierre < mesInicio || cierre > mesFin) return false
     if (c.clienteEstado === 'perdido' && c.fechaPerdido) {
       const perdido = new Date(c.fechaPerdido + 'T12:00:00')
       if (perdido <= mesFin) return false
     }
     return true
-  }), [clientesBase, mesFin])
+  }), [clientesBase, mesInicio, mesFin])
 
   const kgPorProductoMes = useMemo(() => PRODUCTOS.reduce((acc, p) => {
     acc[p] = clientesActivosEnMes
@@ -262,12 +267,14 @@ export default function Panel() {
   })).filter((d) => d.value > 0), [clientesActivos])
 
   // Widget: kilos por mes por tipo — 12 meses del año elegido en los filtros globales
-  // (o los últimos 12 meses corridos si el filtro de año está en "Todos")
+  // (o los últimos 12 meses corridos si el filtro de año está en "Todos"). Igual que el
+  // objetivo de arriba, cada barra es lo CERRADO en ese mes puntual, no acumulado.
   const kgPorMesTipoData = useMemo(() => {
     const meses = filterAno
       ? Array.from({ length: 12 }, (_, i) => new Date(Number(filterAno), i, 1))
       : Array.from({ length: 12 }, (_, i) => subMonths(new Date(), 11 - i))
     return meses.map((mes) => {
+      const inicio = startOfMonth(mes)
       const fin = endOfMonth(mes)
       const row = { mes: format(mes, 'MMM yy', { locale: es }) }
       TIPOS_CLIENTE.forEach((tipo) => {
@@ -275,7 +282,7 @@ export default function Panel() {
           .filter((c) => {
             if (c.tipoCliente !== tipo || !c.fechaCierre) return false
             const cierre = new Date(c.fechaCierre + 'T12:00:00')
-            if (cierre > fin) return false
+            if (cierre < inicio || cierre > fin) return false
             if (c.clienteEstado === 'perdido' && c.fechaPerdido) {
               const perdido = new Date(c.fechaPerdido + 'T12:00:00')
               if (perdido <= fin) return false
