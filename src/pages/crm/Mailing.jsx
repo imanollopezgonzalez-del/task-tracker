@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
+import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle, PenSquare } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -8,6 +8,7 @@ import { useGoogleOAuth } from '../../hooks/useGoogleOAuth'
 import {
   subscribeConnectedAccounts, connectGmailAccount, disconnectGmailAccount, subscribeMailingLogs,
 } from '../../services/mailing'
+import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
 
 function AccountRow({ account, onDisconnect }) {
   const [disconnecting, setDisconnecting] = useState(false)
@@ -81,6 +82,7 @@ export default function Mailing() {
   const [accounts, setAccounts] = useState([])
   const [logs, setLogs] = useState([])
   const [connecting, setConnecting] = useState(false)
+  const [showCompose, setShowCompose] = useState(false)
 
   useEffect(() => {
     if (!companyId) return
@@ -116,9 +118,19 @@ export default function Mailing() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="px-6 py-4 border-b border-brand-border bg-white flex-shrink-0">
-        <h1 className="text-lg font-bold text-brand-text">Mailing</h1>
-        <p className="text-xs text-brand-text-muted mt-0.5">Cuentas de Gmail conectadas e historial de envíos</p>
+      <div className="px-6 py-4 border-b border-brand-border bg-white flex-shrink-0 flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-bold text-brand-text">Mailing</h1>
+          <p className="text-xs text-brand-text-muted mt-0.5">Cuentas de Gmail conectadas e historial de envíos</p>
+        </div>
+        <button
+          onClick={() => setShowCompose(true)}
+          disabled={accounts.length === 0}
+          title={accounts.length === 0 ? 'Conectá una cuenta de Gmail primero' : ''}
+          className="btn-primary text-xs px-3 py-1.5"
+        >
+          <PenSquare size={14} /> Nuevo email
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
@@ -170,6 +182,8 @@ export default function Mailing() {
           )}
         </div>
       </div>
+
+      {showCompose && <ComposeEmailModal onClose={() => setShowCompose(false)} />}
     </div>
   )
 }
