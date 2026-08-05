@@ -33,6 +33,12 @@ export const sendEmail = async ({ fromAccountId, to, subject, htmlBody, attachme
   return res.data
 }
 
+export const sendBulkEmail = async ({ fromAccountId, subject, htmlBody, recipients, attachments, templateId, audienceType }) => {
+  const fn = httpsCallable(functions, 'sendBulkMail')
+  const res = await fn({ fromAccountId, subject, htmlBody, recipients, attachments, templateId, audienceType })
+  return res.data
+}
+
 export const subscribeMailingLogs = (companyId, callback) => {
   const q = query(collection(db, MAILING_LOGS_COL), where('companyId', '==', companyId))
   return onSnapshot(

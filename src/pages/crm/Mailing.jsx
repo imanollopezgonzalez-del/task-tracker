@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle, PenSquare, Pencil, FileType } from 'lucide-react'
+import { Mail, Plus, Trash2, Loader2, AlertTriangle, CheckCircle2, XCircle, PenSquare, Pencil, FileType, Megaphone } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
@@ -11,6 +11,7 @@ import {
 } from '../../services/mailing'
 import ComposeEmailModal from '../../components/mailing/ComposeEmailModal'
 import TemplateModal from '../../components/mailing/TemplateModal'
+import BulkSendPanel from '../../components/mailing/BulkSendPanel'
 
 function AccountRow({ account, onDisconnect }) {
   const [disconnecting, setDisconnecting] = useState(false)
@@ -85,6 +86,7 @@ export default function Mailing() {
   const [logs, setLogs] = useState([])
   const [connecting, setConnecting] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
+  const [showBulkSend, setShowBulkSend] = useState(false)
   const [templates, setTemplates] = useState([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
@@ -144,14 +146,24 @@ export default function Mailing() {
           <h1 className="text-lg font-bold text-brand-text">Mailing</h1>
           <p className="text-xs text-brand-text-muted mt-0.5">Cuentas de Gmail conectadas e historial de envíos</p>
         </div>
-        <button
-          onClick={() => setShowCompose(true)}
-          disabled={accounts.length === 0}
-          title={accounts.length === 0 ? 'Conectá una cuenta de Gmail primero' : ''}
-          className="btn-primary text-xs px-3 py-1.5"
-        >
-          <PenSquare size={14} /> Nuevo email
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBulkSend(true)}
+            disabled={accounts.length === 0}
+            title={accounts.length === 0 ? 'Conectá una cuenta de Gmail primero' : ''}
+            className="btn-secondary text-xs px-3 py-1.5"
+          >
+            <Megaphone size={14} /> Envío masivo
+          </button>
+          <button
+            onClick={() => setShowCompose(true)}
+            disabled={accounts.length === 0}
+            title={accounts.length === 0 ? 'Conectá una cuenta de Gmail primero' : ''}
+            className="btn-primary text-xs px-3 py-1.5"
+          >
+            <PenSquare size={14} /> Nuevo email
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
@@ -247,6 +259,8 @@ export default function Mailing() {
       )}
 
       {showCompose && <ComposeEmailModal onClose={() => setShowCompose(false)} />}
+
+      {showBulkSend && <BulkSendPanel onClose={() => setShowBulkSend(false)} />}
     </div>
   )
 }

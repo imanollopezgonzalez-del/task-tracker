@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
-import { subscribeConnectedAccounts, sendEmail, uploadMailingAttachment } from '../../services/mailing'
+import { subscribeConnectedAccounts, sendEmail, uploadMailingAttachment, subscribeMailTemplates } from '../../services/mailing'
 import { useMailEditor, EmailEditorToolbar, EditorContent } from './EmailBodyEditor'
 export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   const { userProfile } = useAuth()
@@ -16,6 +16,7 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   const [subject, setSubject] = useState('')
   const [attachments, setAttachments] = useState([])
   const [sending, setSending] = useState(false)
+  const [templates, setTemplates] = useState([])
 
   useEffect(() => {
     if (!companyId) return
@@ -26,7 +27,21 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
     return unsub
   }, [companyId])
 
+  useEffect(() => {
+    if (!companyId) return
+    const unsub = subscribeMailTemplates(companyId, setTemplates)
+    return unsub
+  }, [companyId])
+
   const { editor, handlePickImage } = useMailEditor({ companyId })
+
+  const handlePickTemplate = (id) => {
+    const t = templates.find((tpl) => tpl.id === id)
+    if (!t) return
+    setSubject(t.subject)
+    const html = t.mode === 'html' ? t.htmlSource : t.richBodyHtml
+    editor?.commands.setContent(html || '')
+  }
 
   const handlePickAttachment = () => {
     const input = document.createElement('input')
@@ -106,6 +121,19 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
             <label className="label">Para</label>
             <input className="input-field" value={toValue} onChange={(e) => setToValue(e.target.value)} placeholder="destinatario@ejemplo.com" />
           </div>
+
+          {templates.length > 0 && (
+            <div>
+              <label className="label">Plantilla</label>
+              <select className="select-field" defaultValue="" onChange={(e) => handlePickTemplate(e.target.value)}>
+                <option value="">Escribir desde cero</option>
+                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <p className="text-xs text-brand-text-light mt-1">
+                Si la plantilla tiene <code>{'{{nombre}}'}</code>/<code>{'{{empresa}}'}</code>, acá no se reemplazan automáticamente — son para envío masivo.
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="label">Asunto</label>
