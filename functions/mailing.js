@@ -308,7 +308,7 @@ const disconnectGmailAccount = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET] },
 // ---------------------------------------------------------------------------
 // sendMail
 // ---------------------------------------------------------------------------
-const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds: 60 }, async (request) => {
+const sendMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds: 60, memory: '512MiB' }, async (request) => {
   const caller = await requireCrmUser(request.auth?.uid)
   const { fromAccountId, to, subject, htmlBody, attachments, leadId } = request.data || {}
 
@@ -444,7 +444,7 @@ function applyMergeFields(text, { nombre, empresa }) {
 
 const MAX_BULK_RECIPIENTS = 500
 
-const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds: 540 }, async (request) => {
+const sendBulkMail = onCall({ secrets: [GOOGLE_OAUTH_CLIENT_SECRET], timeoutSeconds: 540, memory: '512MiB' }, async (request) => {
   const caller = await requireCrmUser(request.auth?.uid)
   const { fromAccountId, subject, htmlBody, recipients, attachments, templateId, audienceType } = request.data || {}
 

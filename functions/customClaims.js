@@ -21,13 +21,14 @@ const syncUserClaims = onDocumentWritten('users/{uid}', async (event) => {
     crmAccess: after.crmAccess === true,
   }
 
-  const before = event.data?.before?.data()
-  const sinCambios = before
-    && before.companyId === claims.companyId
-    && before.role === claims.role
-    && (before.crmAccess === true) === claims.crmAccess
-  if (sinCambios) return
-
+  // Antes esto se salteaba si companyId/role/crmAccess no habían cambiado en Firestore
+  // (optimización para no llamar al Admin SDK de más). El problema: setCustomUserClaims
+  // REEMPLAZA todo el objeto de claims, no lo mezcla, y como esos campos siempre están
+  // presentes en cada escritura de perfil, el "sin cambios" también se activaba de
+  // pura casualidad justo cuando los claims reales del token estaban corruptos por un
+  // ajuste manual previo (ej. varias llamadas de auth_update_user, cada una pisando la
+  // anterior) — la función veía Firestore sin cambios y nunca los volvía a escribir. Se
+  // saca el atajo: escribir de más es barato, dejar el token desincronizado no.
   await getAuth().setCustomUserClaims(uid, claims)
 })
 
