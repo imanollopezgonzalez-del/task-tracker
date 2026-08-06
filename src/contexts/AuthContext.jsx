@@ -157,6 +157,10 @@ export function AuthProvider({ children }) {
       await setDoc(doc(db, 'users', result.user.uid), { email }, { merge: true })
       await refreshProfile()
     }
+    // A diferencia de un sign-in nuevo, vincular una cuenta NO dispara onAuthStateChanged
+    // (sigue siendo el mismo uid/sesión) — así que el refresh forzado de ahí nunca corre acá.
+    // Sin esto, la sesión actual puede seguir usando un token viejo indefinidamente.
+    scheduleTokenRefresh(result.user)
     return result.user
   }
 
