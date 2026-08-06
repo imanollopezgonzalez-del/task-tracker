@@ -45,5 +45,37 @@ export function useGoogleOAuth() {
     })
   }
 
-  return { requestGmailAuthCode }
+  // Access token de corta duración (no se guarda, solo vive en memoria mientras el picker
+  // está abierto) para que el Google Picker pueda listar archivos de Drive. Deliberadamente
+  // separado del flujo de "Conectar cuenta de Gmail": ese guarda un refresh_token server-side
+  // para poder mandar mail más adelante sin volver a pedir permiso; esto es un permiso
+  // puntual de lectura de Drive que se pide de nuevo cada vez que se abre el picker, así el
+  // usuario puede elegir en el momento con qué cuenta de Google navega Drive (Pollo Cocido,
+  // Pariggi, la que sea) sin tener que preconectarlas.
+  const requestDriveAccessToken = async () => {
+    await loadGisScript()
+
+    return new Promise((resolve, reject) => {
+      const clientId = import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID
+      if (!clientId) {
+        reject(new Error('Falta configurar VITE_GOOGLE_OAUTH_CLIENT_ID'))
+        return
+      }
+
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/drive.readonly',
+        callback: (response) => {
+          if (response.error) {
+            reject(new Error(response.error))
+            return
+          }
+          resolve(response.access_token)
+        },
+      })
+      client.requestAccessToken()
+    })
+  }
+
+  return { requestGmailAuthCode, requestDriveAccessToken }
 }

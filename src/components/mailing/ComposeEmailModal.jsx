@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { subscribeConnectedAccounts, sendEmail, uploadMailingAttachment, subscribeMailTemplates } from '../../services/mailing'
 import { useMailEditor, EmailEditorToolbar, EditorContent } from './EmailBodyEditor'
+import DriveAttachButton from './DriveAttachButton'
 export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   const { userProfile } = useAuth()
   const companyId = userProfile?.companyId
@@ -59,12 +60,18 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
     }
   }
 
+  const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024 // igual al límite de storage.rules
+
   const handlePickAttachment = () => {
     const input = document.createElement('input')
     input.type = 'file'
     input.onchange = async () => {
       const file = input.files?.[0]
       if (!file) return
+      if (file.size >= MAX_ATTACHMENT_BYTES) {
+        toast.error(`"${file.name}" pesa ${(file.size / 1024 / 1024).toFixed(1)}MB, el máximo es 20MB`)
+        return
+      }
       const tempId = crypto.randomUUID()
       setAttachments((list) => [...list, { id: tempId, filename: file.name, uploading: true }])
       try {
@@ -72,7 +79,13 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
         setAttachments((list) => list.map((a) => (a.id === tempId ? { ...uploaded, id: tempId } : a)))
       } catch (err) {
         console.error(err)
-        toast.error(`No se pudo subir "${file.name}"`)
+        // storage/unauthorized es el código genérico que Firebase usa tanto para falta de
+        // permiso como para violar cualquier otra condición de la regla (ej. tamaño) — no
+        // hay forma de distinguirlos desde el cliente, así que el mensaje cubre ambos casos.
+        const reason = err.code === 'storage/unauthorized'
+          ? 'sin permiso o el archivo supera el límite de 20MB'
+          : (err.code || err.message || 'error desconocido')
+        toast.error(`No se pudo subir "${file.name}" (${reason})`)
         setAttachments((list) => list.filter((a) => a.id !== tempId))
       }
     }
@@ -80,6 +93,13 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   }
 
   const removeAttachment = (id) => setAttachments((list) => list.filter((a) => a.id !== id))
+
+  const handleDrivePicked = ({ name, url }) => {
+    editor?.chain().focus().insertContent(
+      `<p><a href="${url}" target="_blank" rel="noopener noreferrer">📎 ${name}</a></p>`
+    ).run()
+    toast.success(`Link a "${name}" insertado en el mensaje`)
+  }
 
   const handleSend = async () => {
     if (!fromAccountId) { toast.error('Elegí desde qué cuenta enviar'); return }
@@ -182,9 +202,12 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
           </div>
 
           <div>
-            <button type="button" onClick={handlePickAttachment} className="btn-ghost text-xs px-2 py-1.5">
-              <Paperclip size={14} /> Adjuntar archivo
-            </button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={handlePickAttachment} className="btn-ghost text-xs px-2 py-1.5">
+                <Paperclip size={14} /> Adjuntar archivo
+              </button>
+              <DriveAttachButton onPicked={handleDrivePicked} />
+            </div>
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 mt-2">
                 {attachments.map((a) => (
