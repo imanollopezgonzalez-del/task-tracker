@@ -3,6 +3,20 @@ import { HardDrive, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useGoogleOAuth } from '../../hooks/useGoogleOAuth'
 import { GOOGLE_MAPS_API_KEY } from '../../config/googleMaps'
+import { DRIVE_DEFAULT_FOLDERS } from '../../config/driveDefaultFolders'
+
+async function getAuthorizedEmail(accessToken) {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.email?.toLowerCase() || null
+  } catch {
+    return null
+  }
+}
 
 const PICKER_API_SRC = 'https://apis.google.com/js/api.js'
 
@@ -40,10 +54,13 @@ export default function DriveAttachButton({ onPicked }) {
     try {
       await loadPickerLib()
       const accessToken = await requestDriveAccessToken()
+      const email = await getAuthorizedEmail(accessToken)
+      const defaultFolderId = email ? DRIVE_DEFAULT_FOLDERS[email] : null
 
       const view = new window.google.picker.DocsView()
         .setIncludeFolders(false)
         .setSelectFolderEnabled(false)
+      if (defaultFolderId) view.setParent(defaultFolderId)
 
       const picker = new window.google.picker.PickerBuilder()
         .addView(view)

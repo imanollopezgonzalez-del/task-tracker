@@ -95,9 +95,18 @@ export default function ComposeEmailModal({ to = '', leadId = null, onClose }) {
   const removeAttachment = (id) => setAttachments((list) => list.filter((a) => a.id !== id))
 
   const handleDrivePicked = ({ name, url }) => {
-    editor?.chain().focus().insertContent(
-      `<p><a href="${url}" target="_blank" rel="noopener noreferrer">📎 ${name}</a></p>`
-    ).run()
+    // Se inserta como nodo estructurado (no como string HTML concatenado): el nombre del
+    // archivo viene de Drive sin validar y podría tener cualquier contenido (alguien podría
+    // compartir un archivo con el nombre armado a propósito) — así Tiptap lo trata siempre
+    // como texto/atributo, nunca como markup, sin necesidad de escapar a mano.
+    editor?.chain().focus().insertContent({
+      type: 'paragraph',
+      content: [{
+        type: 'text',
+        text: `📎 ${name}`,
+        marks: [{ type: 'link', attrs: { href: url, target: '_blank', rel: 'noopener noreferrer' } }],
+      }],
+    }).run()
     toast.success(`Link a "${name}" insertado en el mensaje`)
   }
 
