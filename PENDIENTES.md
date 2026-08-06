@@ -6,9 +6,9 @@
 - [x] Autorizar dominio `imanollopezgonzalez-del.github.io` en Authorized domains
 - [x] Imanol vinculó su cuenta de Google (se borró una cuenta huérfana que había quedado de un intento previo fallido)
 - [x] Mostrar "Ajustes" en el menú a todos los usuarios, no solo admin
-- [ ] Iván: vincular su cuenta de Google desde Ajustes (los adjuntos de mail ya confirmados funcionando)
+- [x] Iván vinculó su cuenta de Google (adjuntos de mail confirmados funcionando)
 - [ ] Rodrigo: vincular su cuenta de Google desde Ajustes (ya tiene acceso al menú)
-- [ ] Una vez Iván y Rodrigo confirmen vinculado: sacar el login con usuario+PIN de `src/pages/Login.jsx` (quedó como puente temporal, no es el diseño final)
+- [ ] Una vez Rodrigo confirme vinculado: sacar el login con usuario+PIN de `src/pages/Login.jsx` (quedó como puente temporal, no es el diseño final)
 
 ## Mailing — adjuntos y Drive
 
